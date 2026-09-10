@@ -32,7 +32,9 @@ export async function onRequestPost(context) {
       return Response.json({ valid: false }, { status: 400 });
     }
     await context.env.CODES.delete(usedKey); // single-use
-    return Response.json({ valid: true, tier: TIERS[String(stored).toLowerCase()] || 'pro' });
+    // Strip surrounding quotes: `kv:key put ... '"base"'` stores them literally.
+    const tierKey = String(stored).replace(/"/g, '').trim().toLowerCase();
+    return Response.json({ valid: true, tier: TIERS[tierKey] || 'pro' });
   } catch (e) {
     return Response.json({ valid: false }, { status: 500 });
   }
