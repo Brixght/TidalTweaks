@@ -59,17 +59,20 @@ npm.cmd run build    # → electron/dist/TidalTweaks Setup X.Y.Z.exe
 > `npm` may be blocked by PowerShell's execution policy — use `npm.cmd`, or run
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-## 🔑 Activation server (for the seller)
+## 🔑 Activation server (for the seller — API only, no website needed)
 
-The app validates codes against a Cloudflare Pages function backed by KV:
+The app validates codes against one Cloudflare Pages Function backed by KV.
+Everything deploy-ready lives in [`cloudflare/`](cloudflare/) (function +
+`wrangler.toml` + step-by-step guide) — full instructions in
+[`cloudflare/README.md`](cloudflare/README.md). Short version:
 
-1. Create a Cloudflare Pages project with the function in [`cloudflare-validate-code.example.js`](cloudflare-validate-code.example.js) at `functions/api/validate-code.js`
-2. Bind a KV namespace called `CODES`
-3. Add one-time codes **with the tier as the value** (`base`, `pro`, or `extreme`):
-   `wrangler kv:key put --binding=CODES "BASE-XXXX" '"base"'`
-4. Paste your `https://<site>.pages.dev/api/validate-code` URL in the app's Settings → Save URL (or bake it into `electron/main.js` → `DEFAULT_API_URL`)
+1. Pages → Upload assets → drop the `cloudflare/` folder, name it `tidaltweaks`
+2. Bind a KV namespace called `CODES`, redeploy
+3. Bulk-upload your codes: `wrangler kv:bulk put --binding=CODES kv-import-base.json` (×3 tiers)
+4. Test with a garbage code (must return `{"valid":false}` — burns nothing)
 
-Used codes are deleted from KV on first validation — sharing a code is pointless.
+Name it `tidaltweaks` and the app needs zero configuration (that's its
+default URL). Any other name: paste it in the app's Settings → Save URL.
 
 ## 📁 Project layout
 

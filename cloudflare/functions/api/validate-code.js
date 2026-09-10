@@ -1,16 +1,12 @@
-// Cloudflare Pages Function: functions/api/validate-code.js
-// Deploy on Cloudflare Pages with a KV namespace bound as CODES.
+// POST /api/validate-code  — TidalTweaks license check (no website needed,
+// this function IS the entire backend; Pages serves it at
+// https://<your-project>.pages.dev/api/validate-code).
 //
-// PER-TIER CODES: the KV *value* names the tier the code unlocks:
-//   wrangler kv:key put --binding=CODES "BASE-XXXX" '"base"'
-//   wrangler kv:key put --binding=CODES "PRO-XXXX"  '"pro"'
-//   wrangler kv:key put --binding=CODES "EXT-XXXX"  '"extreme"'
-// Legacy values ("1", "true", empty) are treated as Pro.
+// KV namespace bound as CODES. The VALUE names the tier:
+//   "base" | "pro" | "extreme"   (legacy "1"/"true"/empty also mean Pro)
 //
-// Contract with TidalTweaks (license:validate in electron/main.js):
-//   POST {pages-url}/api/validate-code  {"code": "..."}
-//   -> {"valid": true, "tier": "base"|"pro"|"extreme"}  (code DELETED, single-use)
-//   -> {"valid": false} with HTTP 400  (unknown / already-used code)
+//   -> {"valid": true, "tier": "..."}   (code DELETED first: single-use)
+//   -> {"valid": false}  with HTTP 400  (unknown / already-used / empty)
 
 const TIERS = { base: 'base', pro: 'pro', extreme: 'extreme', 1: 'pro', true: 'pro' };
 
@@ -31,7 +27,7 @@ export async function onRequestPost(context) {
     if (stored === null) {
       return Response.json({ valid: false }, { status: 400 });
     }
-    await context.env.CODES.delete(usedKey); // single-use
+    await context.env.CODES.delete(usedKey); // single-use: gone before we answer
     // Strip surrounding quotes: `kv:key put ... '"base"'` stores them literally.
     const tierKey = String(stored).replace(/"/g, '').trim().toLowerCase();
     return Response.json({ valid: true, tier: TIERS[tierKey] || 'pro' });
