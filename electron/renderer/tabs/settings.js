@@ -10,13 +10,16 @@
     let s;
     try { s = await TT.api.license.status(); }
     catch (e) { $('license-status').textContent = 'Status unavailable.'; return; }
-    $('license-status').textContent = s.pro
-      ? `👑 PRO ACTIVE since ${(s.activatedAt || '').slice(0, 10)} — all tweaks unlocked.`
-      : 'FREE version — activate Pro to unlock every tweak below the PRO divider.';
+    const tier = (s && typeof s.tier === 'number') ? s.tier : 0;
+    const tname = (TT.TIER_NAMES[tier] || 'Free').toUpperCase();
+    $('license-status').textContent = tier > 0
+      ? `👑 ${tname} ACTIVE since ${(s.activatedAt || '').slice(0, 10)} — ${tier >= 3 ? 'everything' : 'all ' + tname + ' and below'} unlocked.`
+      : 'FREE version — pick a tier below to unlock more tweaks.';
     $('api-url').value = s.apiUrl || '';
     $('account-line').textContent = s.username
-      ? `Signed in as ${s.username} (${s.role})${s.pro ? ' · 👑 Pro' : ' · Free'}.`
+      ? `Signed in as ${s.username} (${s.role}) · ${tname}${tier >= 2 ? ' 👑' : ''}.`
       : 'Not signed in.';
+    paintPricing(tier);
     // Lite-mode toggle reflects the stored preference (auto/on/off).
     const liteSel = $('lite-mode');
     if (liteSel) liteSel.value = s.litePref || 'auto';
@@ -24,6 +27,51 @@
     if (liteNote) liteNote.textContent = s.lite
       ? 'Lite mode is ACTIVE (flat panels, no GPU effects).'
       : 'Full glass effects are on.';
+  }
+
+  /* Pricing table: 4 tiers with live tweak counts (no hardcoded numbers to
+   * drift — TT.tierStats() counts the actual catalog). */
+  function paintPricing(myTier) {
+    const box = $('tier-list');
+    if (!box) return;
+    const st = TT.tierStats();
+    const cum = [st.free, st.cumBase, st.cumPro, st.total];
+    const blurbs = [
+      'Everyday tools + safe tweaks. Yours forever, no code needed.',
+      'Power plans, visual tuning, safe services, standby janitor + more.',
+      'The full performance pipeline: gaming, CPU, network, debloat, privacy.',
+      'Boot-config, security trade-offs, device surgery. The danger zone.',
+    ];
+    box.innerHTML = '';
+    for (let t = 0; t <= 3; t++) {
+      const row = document.createElement('div');
+      row.className = 'tweak-card' + (myTier === t ? ' applied' : '');
+      const info = document.createElement('div');
+      info.className = 'tweak-info';
+      const b = document.createElement('b');
+      b.textContent = `${TT.TIER_NAMES[t]} — $${TT.TIER_PRICES[t]}${t === 0 ? '' : ' one-time'}`;
+      const p = document.createElement('p');
+      p.textContent = `${cum[t]} tweaks unlocked · ${blurbs[t]}` +
+        (myTier === t ? ' · ← YOU ARE HERE' : '');
+      info.append(b, p);
+      row.appendChild(info);
+      if (t > 0 && myTier < t) {
+        const btn = document.createElement('button');
+        btn.className = 'btn gold';
+        btn.style.cssText = 'padding:7px 14px;font-size:12px';
+        btn.textContent = `Get ${TT.TIER_NAMES[t]}`;
+        btn.onclick = () => {
+          TT.toast(`Pay $${TT.TIER_PRICES[t]} to $AlwaysBetOnBright, then DM chrome.bright “${TT.TIER_NAMES[t].toUpperCase()}” + receipt.`, 'gold', 6000);
+          const code = $('license-code');
+          if (code) code.focus();
+        };
+        const wrap = document.createElement('div');
+        wrap.className = 'tweak-actions';
+        wrap.appendChild(btn);
+        row.appendChild(wrap);
+      }
+      box.appendChild(row);
+    }
   }
 
   $('license-go').onclick = async () => {
@@ -63,7 +111,7 @@
   $('license-check').onclick = async () => {
     await TT.refreshLicense(false);
     paint();
-    TT.toast(TT.pro ? 'Pro is active. 👑' : 'Free version — no active license.', TT.pro ? 'gold' : '', 3000);
+    TT.toast(TT.tier > 0 ? `${TT.tierName} is active. 👑` : 'Free version — no active license.', TT.tier > 0 ? 'gold' : '', 3000);
   };
   $('license-deactivate').onclick = async () => {
     await TT.api.license.deactivate().catch(() => {});

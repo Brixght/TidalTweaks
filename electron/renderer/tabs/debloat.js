@@ -81,9 +81,9 @@
       track.className = 'track';
       label.append(cb, track);
       cb.onchange = async () => {
-        if (!TT.pro) { // fail fast before the confirm modal
+        if (TT.tier < 3) { // fail fast before the confirm modal (Extreme-only)
           cb.checked = !cb.checked;
-          TT.toast('🔒 Device disables need Pro — opening Settings…', 'gold', 3500);
+          TT.toast('🔒 Device disables need Extreme ($30) — opening Settings…', 'gold', 3500);
           TT.switchTab('settings');
           return;
         }
@@ -119,6 +119,7 @@
   TT.renderTweaks(document.querySelector('[data-tweaks="debloat"]'), [
     'debloat-onedrive', 'debloat-edge', 'debloat-visual-fx',
     'debloat-no-hibernate', 'debloat-disk-cleanup', 'debloat-chrome-bg',
+    'debloat-cortana-app', 'debloat-xbox-app',
   ]);
   TT.renderTweaks(document.querySelector('[data-tweaks="services"]'), [
     'svc-xbox-off', 'svc-printer-off', 'svc-bluetooth-off',

@@ -114,7 +114,28 @@ async function chromeBackgroundOff() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Remove the Cortana AppX (Microsoft.549981C3F5F10). The policy tweak
+ * (adv-no-cortana equivalent) is separate — this removes the app package. */
+async function removeCortanaApp() {
+  try {
+    const r = await runPS('Get-AppxPackage -Name "Microsoft.549981C3F5F10" -AllUsers:$false | Remove-AppxPackage -ErrorAction SilentlyContinue; Write-Output DONE', 120000);
+    if (!(r.stdout || '').includes('DONE')) return { ok: false, message: 'Removal script failed.' };
+    return { ok: true, message: 'Cortana app removed (reinstall from Store if missed).', revert: { kind: 'none' } };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Remove the Xbox App (Microsoft.XboxApp) — NOT GamingServices, so Store
+ * games and Game Bar companions keep working. */
+async function removeXboxApp() {
+  try {
+    const r = await runPS('Get-AppxPackage -Name "Microsoft.XboxApp" -AllUsers:$false | Remove-AppxPackage -ErrorAction SilentlyContinue; Write-Output DONE', 120000);
+    if (!(r.stdout || '').includes('DONE')) return { ok: false, message: 'Removal script failed.' };
+    return { ok: true, message: 'Xbox app removed (GamingServices untouched).', revert: { kind: 'none' } };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   scanInstalled, removePackages, removeOneDrive, removeEdge,
   disableVisualEffects, disableHibernation, runDiskCleanup, chromeBackgroundOff,
+  removeCortanaApp, removeXboxApp,
 };

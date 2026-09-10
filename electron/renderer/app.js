@@ -133,6 +133,7 @@
    * Tab scripts render groups of these via renderTweaks().
    * ========================================================================== */
   const TWEAKS = {
+    'cpu-no-idle-states': { os: 'both', t: 'Disable deep CPU idle (C-states)', d: 'Cores never park into deep sleep — steadier frame times, warmer idle.', m: 'Will set IDLEDISABLE=1 on the active power scheme (AC).\nExpect higher idle temps/power. Reversible.' },
     // ————— Gaming & latency —————
     'game-mode-master': { t: 'Gaming Mode master toggle', d: 'Priority boost + Game Bar/DVR off + HAGS + High Performance plan in one click.', m: 'Will: raise the foreground game to High priority, disable Game Bar & Game DVR capture, enable GPU scheduling (HAGS), and switch to the High Performance power plan.\nHAGS needs a reboot to take effect.' },
     'game-power-ultimate': { t: 'Ultimate Performance power plan', d: 'Unlocks and activates the hidden Ultimate Performance scheme.', m: 'Will run: powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 and set it active.\nOn editions without the scheme it falls back to High Performance.' },
@@ -148,6 +149,8 @@
     'game-mode-win-on': { free: true, os: 'both', t: 'Windows Game Mode ON', d: 'The real Game Mode — Windows deprioritizes background work for the game.', m: 'Will set AllowAutoGameMode=1.\nDifferent from Game Bar/DVR (which stay off).' },
     'game-mouse-raw': { free: true, os: 'both', t: 'Raw mouse (no acceleration)', d: 'Pointer precision OFF — true 1:1 mouse movement.', m: 'Will zero MouseSpeed/MouseThreshold1/MouseThreshold2.\nRe-apply in-game sensitivity afterwards.' },
     'game-keyboard-fast': { free: true, os: 'both', t: 'Fastest key repeat', d: 'Minimal delay, maximum repeat rate for movement keys.', m: 'Will set KeyboardDelay=0 and KeyboardSpeed=31.' },
+    'game-discrete-gpu': { os: 'both', t: 'Force discrete GPU for saved games', d: 'Writes GpuPreference=2 per saved exe — laptops stop picking the iGPU.', m: 'Will set GpuPreference=2 for every exe in your Gaming → priority list.\nUses the SAVED list — use the "Force discrete GPU" button there so it sends your list. Previous per-exe values are captured for undo.' },
+    'gpu-no-mpo': { os: 'both', t: 'Multiplane Overlay off', d: "Microsoft's documented flicker/stutter workaround for odd GPU+monitor combos.", m: 'Will set OverlayTestMode=5.\nIf nothing changes for you, revert — MPO helps laptop battery life.' },
     // ————— GPU vendor (display adapters only) —————
     'gpu-nv-telemetry': { t: 'Disable NVIDIA telemetry', d: 'Stops + disables the NvTelemetryContainer service. Drivers keep working.', m: 'Will stop and disable the NvTelemetryContainer service.\nNVIDIA drivers and GeForce Experience keep working — only the telemetry pipe stops.' },
     'gpu-msi-mode': { t: 'GPU MSI mode (lower DPC latency)', d: 'MSISupported=1 on display adapters — interrupts instead of legacy lines.', m: 'Will set MSISupported=1 on your PCI display adapter(s).\nREQUIRES REBOOT. Skips audio/USB devices entirely.' },
@@ -163,6 +166,10 @@
     'net-nic-eco-off': { os: 'both', t: 'Disable NIC eco features', d: 'Kills Interrupt Moderation, Green Ethernet, wake-patterns; forces RSS on.', m: 'Will flip eco advanced-properties to Disabled per up adapter (unsupported names are skipped — drivers vary) and set Receive Side Scaling to Enabled.\nReboot to apply.' },
     'net-qos-limit': { free: true, os: 'both', t: 'QoS bandwidth cap → 0%', d: 'Forces the reservable-bandwidth policy to zero. Honestly minor on Win10/11.', m: 'Will set NonBestEffortLimit=0.\nTruth in advertising: modern Windows does not reserve bandwidth the way the old myth claims — this just guarantees nothing can throttle.' },
     'net-reset-stack': { os: 'both', t: 'Reset network stack', d: 'winsock + IP reset. The classic "nothing else fixed it" repair.', m: '⚠ Will run netsh winsock reset + netsh int ip reset.\nYou MUST reboot after. VPN/virtual adapters may need re-setup.' },
+    'net-ecn-on': { os: 'both', t: 'Explicit Congestion Notification on', d: 'Better behavior on lossy/bufferbloated paths (hotel Wi-Fi, bad nodes).', m: 'Will run netsh interface tcp set global ecncapability=enabled.\nReversible to disabled.' },
+    'net-rsc-off': { os: 'both', t: 'Receive Segment Coalescing off', d: 'Trades a little bulk throughput for lower, steadier latency.', m: 'Will run netsh interface tcp set global rsc=disabled.\nIf downloads get slower, revert.' },
+    'net-no-tunnel': { os: 'both', t: 'Dead transition tunnels off', d: 'Disables Teredo/6to4/ISATAP — less surface, fewer weird tunnels.', m: 'Will disable all three transition technologies.\n⚠ Xbox party chat uses Teredo — revert if party chat breaks.' },
+    'net-adapter-restart': { os: 'both', t: 'Restart network adapters', d: 'Disable → enable every up adapter. The classic repair button.', m: 'Will bounce every active physical adapter.\n5–10s connection blip, no reboot. Nothing is uninstalled.' },
     // ————— Performance & CPU —————
     'cpu-boost-mode': { t: 'Processor boost mode (unlock + Aggressive)', d: 'Unhides the boost setting (Attributes 0→2) then sets Aggressive.', m: 'Will set Attributes=2 on be337238-0d82-4146-a960-4f3749d470c7 to unhide it, then set the boost policy to Aggressive (3).\nMore boost = more heat. Watch thermals on laptops.' },
     'cpu-no-throttle': { t: 'Disable CPU power throttling', d: 'PowerThrottlingOff=1 — stops Windows parking/clocking down cores.', m: 'Will set PowerThrottlingOff=1 in the power policy keys. Higher idle power draw.' },
@@ -201,6 +208,11 @@
     'vis-no-lockscreen': { os: 'both', t: 'Skip the lock screen', d: 'Straight to the sign-in prompt, no swipe/click first.', m: 'Will set NoLockScreen=1. Your password/PIN is still required.' },
     'vis-no-login-blur': { free: true, os: 'both', t: 'No logon-screen blur', d: 'Snappier sign-in paint, less GPU work.', m: 'Will set DisableAcrylicBackgroundOnLogon=1.' },
     'vis-taskbar-left': { free: true, os: 'win11', t: 'Taskbar buttons left', d: 'Classic left alignment on Windows 11.', m: 'Will set TaskbarAl=0 (restart Explorer to see it).' },
+    'vis-classic-clock': { free: true, os: 'win11', t: 'Classic clock flyout', d: 'Old-style taskbar clock panel on Windows 11.', m: 'Will set UseWin32TrayClockExperience=0.' },
+    'vis-no-taskbar-search': { free: true, os: 'win11', t: 'Hide taskbar Search box', d: 'Declutters the bar (Win+S still searches).', m: 'Will set SearchboxTaskbarMode=0.' },
+    'vis-taskbar-seconds': { free: true, os: 'win11', t: 'Clock shows seconds', d: 'Taskbar clock with seconds precision.', m: 'Will set SecondsInSystemClock=1.' },
+    'vis-classic-alttab': { free: true, os: 'both', t: 'Classic Alt+Tab switcher', d: 'XP-style icon grid instead of thumbnails.', m: 'Will set AltTabSettings=1.' },
+    'vis-no-shake': { free: true, os: 'both', t: 'Aero Shake off', d: 'Shaking a window stops minimizing everything else.', m: 'Will set DisallowShaking=1.' },
     // ————— Advanced system —————
     'adv-no-indexing': { t: 'Disable Search indexing (WSearch)', d: 'Stops the indexer hammering your disk in the background.', m: 'Will stop and disable the WSearch service.\nStart-menu search still works, just slower on huge drives.' },
     'adv-no-sysmain': { t: 'Disable SysMain (Superfetch)', d: 'Great for SSDs — stops pointless prefetch disk churn.', m: 'Will stop and disable the SysMain service. Recommended on SSDs; HDD users may prefer to keep it.' },
@@ -225,6 +237,9 @@
     'svc-fax-off': { os: 'both', t: 'Disable Fax service', d: 'It is not 2004 anymore.', m: 'Will stop + disable the Fax service.' },
     'svc-insider-off': { os: 'both', t: 'Disable Insider service', d: 'No preview builds, no wisvc background work.', m: 'Will stop + disable wisvc.' },
     'svc-touchkbd-off': { os: 'both', t: 'Disable Touch Keyboard service', d: 'Only if you have NO touchscreen — else your keyboard vanishes.', m: '⚠ Will stop + disable TabletInputService.\nTouchscreen/pen users: SKIP THIS. Absent on most desktops (then it reports "nothing to do").' },
+    'adv-no-search-highlights': { free: true, os: 'both', t: 'Search highlights off', d: 'Kills the ad-like rotating panel in Start search.', m: 'Will set IsDynamicSearchBoxEnabled=0.' },
+    'adv-no-error-report': { os: 'both', t: 'Error Reporting off', d: 'No more "looking for a solution" hangs after crashes.', m: 'Will set Disabled=1 under Windows Error Reporting.\nCrash logs stop being sent to Microsoft.' },
+    'adv-no-driver-updates': { os: 'both', t: 'Block driver updates via WU', d: 'Stops Windows Update overwriting your GPU drivers. The classic rage-source.', m: 'Will set ExcludeWUDriversInQualityUpdate=1.\nSecurity + feature updates keep flowing; update GPU drivers manually.' },
     // ————— Optional services (Risxn-style kills, but reversible) —————
     'svc-xbox-off': { t: 'Disable Xbox services', d: 'XblAuthManager, XblGameSave, XboxGipSvc, XboxNetApiSvc → disabled.', m: 'Will stop and disable the four Xbox services.\nXbox app sign-in and Game Bar companions stop working. Reversible.' },
     'svc-printer-off': { t: 'Disable Print Spooler', d: 'Spooler → disabled. For PCs that never print.', m: 'Will stop and disable the Print Spooler.\nYou will NOT be able to print until re-enabled.' },
@@ -248,18 +263,28 @@
     'priv-no-ceip': { os: 'both', t: 'Disable CEIP', d: 'Customer Experience Improvement Program off.', m: 'Will set CEIPEnable=0.' },
     'priv-no-ink-collection': { os: 'both', t: 'Block ink/typing collection', d: 'Stops pen + typing personalization telemetry.', m: 'Will set RestrictImplicitTextCollection=1 and RestrictImplicitInkCollection=1.' },
     'priv-no-feedback': { free: true, os: 'both', t: 'Feedback prompts → Never', d: 'Windows stops asking you to rate it.', m: 'Will set NumberOfSIUFInPeriod=0.' },
+    'priv-no-camera': { os: 'both', t: 'Camera kill-switch', d: 'Enterprise policy: apps get black frames.', m: 'Will set AllowCamera=0.\nBreaks video calls until reverted.' },
+    'priv-no-mic': { os: 'both', t: 'Microphone kill-switch', d: 'Enterprise policy: apps get silence.', m: 'Will set AllowMicrophone=0.\nBreaks voice chat until reverted.' },
+    'priv-no-usb-storage': { os: 'both', t: 'Block USB storage devices', d: 'Thumb drives stop mounting. Keyboards/mice unaffected.', m: 'Will set USBSTOR Start=4.\nYour OWN flash drives stop working too until reverted. Reboot to enforce.' },
     // ————— Power —————
     'power-ultimate': { t: 'Ultimate Performance plan', d: 'Unlock + activate the hidden top-tier power scheme.', m: 'Will run powercfg -duplicatescheme e9a42b02-… then set it active (High Performance fallback if unsupported).' },
     'power-balanced': { t: 'Balanced power plan', d: 'Back to the stock Balanced scheme — the universal "put it back".', m: 'Will activate the Balanced power scheme (381b4222-…). Use after benchmarking or as the Eco preset anchor.' },
     'power-no-modern-standby': { os: 'both', t: 'Real S3 sleep (no Modern Standby)', d: 'Kills "hot bag" drain on supporting laptops.', m: 'Will set CsEnabled=0.\nREQUIRES REBOOT. If the key is absent your board does not support it.' },
+    'power-lid-nothing': { os: 'both', t: 'Lid close = do nothing (AC)', d: 'For docked laptops driving external monitors.', m: 'Will set lid action to 0 on AC power only.\n⚠ Bag-carriers beware: closing the lid will NOT sleep a plugged-in laptop.' },
+    'power-sleep-never': { os: 'both', t: 'Never sleep on AC', d: 'For downloads, servers and overnight renders.', m: 'Will set the sleep timeout to 0 (never) on AC.\nScreen may still dim — that is a separate timer.' },
+    'power-no-auto-hibernate': { os: 'both', t: 'Never auto-hibernate', d: 'Sleep stays sleep — no surprise hiberfil writes.', m: 'Will set the hibernate-after timer to 0.' },
     // ————— System boot & behavior (all Free) —————
     'sys-verbose-boot': { free: true, os: 'both', t: 'Verbose boot messages', d: 'See WHAT Windows is doing instead of spinning dots.', m: 'Will set VerboseStatus=1.' },
     'sys-bsod-details': { free: true, os: 'both', t: 'Technical BSODs', d: 'Blue screens show the stop code + driver instead of ":(".', m: 'Will set DisplayParameters=1. Invaluable the one time you need it.' },
     'sys-fast-shutdown': { free: true, os: 'both', t: 'Fast shutdown/logoff', d: 'Auto-ends hung apps instead of the "waiting" purgatory.', m: 'Will set AutoEndTasks=1, HungAppTimeout=1000, WaitToKillAppTimeout=2000.' },
     'sys-storage-sense': { free: true, os: 'both', t: 'Storage Sense on', d: 'Windows auto-cleans temp + recycle on a schedule.', m: 'Will enable the global Storage Sense policy.' },
+    'sys-boot-legacy': { os: 'both', t: 'Legacy F8 boot menu', d: 'Classic text boot menu with Safe Mode on F8.', m: 'Will run bcdedit /set bootmenupolicy Legacy.\nFor troubleshooters who miss F8.' },
+    'sys-minidump': { os: 'both', t: 'Minidumps, not full dumps', d: 'A crash writes KBs instead of GBs of RAM to disk.', m: 'Will set CrashDumpEnabled=3 (small memory dump).' },
+    'sys-no-bsod-reboot': { os: 'both', t: 'No auto-reboot on blue screens', d: 'Stay on the error so you can read it. Pairs with technical BSODs.', m: 'Will set AutoReboot=0.\nHold the power button to reboot. You were warned.' },
     // ————— Filesystem NTFS (Pro, admin — values captured first) —————
     'disk-no-lastaccess': { os: 'both', t: 'Last-access timestamps off', d: 'Fewer disk writes on file-heavy systems. Your current value is captured for undo.', m: 'Will run fsutil behavior set disablelastaccess 1.\nUndo restores YOUR previous value (checked live on this PC: defaults differ). Reboot to fully apply.' },
     'disk-no-8dot3': { os: 'both', t: '8.3 short filenames off', d: 'Skips legacy name bookkeeping on new files.', m: 'Will run fsutil behavior set disable8dot3 1 (previous value captured for undo).\nAncient 16-bit-era installers can choke — modern software is unaffected.' },
+    'ram-standby-task': { os: 'both', t: 'Standby janitor (scheduled)', d: 'Trims idle memory every 15 min via a scheduled task. ISLC-lite.', m: 'Will write a script to your app-data folder and create the "TidalTweaks Standby Cleaner" task (every 15 min).\nUndo deletes BOTH the task and the script. Use the RAM tab button.' },
     'power-no-usb-suspend': { t: 'Disable USB selective suspend', d: 'Stops USB devices (mice, DACs) micro-sleeping and crackling.', m: 'Will disable USB selective suspend on the active power scheme.' },
     'power-no-disk-sleep': { t: 'Never sleep hard disks', d: 'Disk idle timeout → 0 — no spin-up stutter.', m: 'Will set the disk idle timeout to 0 (never) on the active scheme.' },
     'power-cpu-min-100': { t: 'Processor minimum 100%', d: 'Same as the CPU-tab switch, from the Power tab.', m: 'Will set PROCTHROTTLEMIN=100 on the active scheme. Higher idle power.' },
@@ -271,8 +296,49 @@
     'debloat-no-hibernate': { t: 'Disable hibernation', d: 'powercfg -h off — reclaims hiberfil.sys gigabytes.', m: 'Same as the CPU-tab switch: Hibernate + Fast Startup go away, Sleep stays.' },
     'debloat-disk-cleanup': { t: 'Run Disk Cleanup', d: 'cleanmgr /sagerun:1 — the built-in deep cleaner.', m: 'Will launch the Windows Disk Cleanup engine (Update backups, thumbnails, etc.). Can take several minutes.' },
     'debloat-chrome-bg': { os: 'both', t: 'Chrome: no background mode', d: 'Chrome fully exits instead of idling in the tray.', m: 'Will set the BackgroundModeEnabled enterprise policy to 0.\nTakes effect for Chrome installs (restart Chrome).' },
+    'debloat-cortana-app': { os: 'both', t: 'Remove Cortana app', d: 'Removes the Cortana AppX package for your user.', m: 'Will remove Microsoft.549981C3F5F10 via Remove-AppxPackage.\nReinstall from the Store if you miss her.' },
+    'debloat-xbox-app': { os: 'both', t: 'Remove Xbox app', d: 'Removes the Xbox AppX — GamingServices left alone.', m: 'Will remove Microsoft.XboxApp only.\nStore games and Game Bar companions keep working.' },
   };
 
+  /* TIER MIRROR — must match main.js BASE_TWEAKS/EXTREME_TWEAKS/FREE flags
+   * exactly (the audit script diffs both sides). Tier of an id:
+   *   free flag → 0 · BASE set → 1 · EXTREME set → 3 · otherwise → 2 (Pro).
+   * Higher tiers include everything below (cumulative unlocks). */
+  const TIER_NAMES = ['Free', 'Base', 'Pro', 'Extreme'];
+  const TIER_PRICES = [0, 5, 15, 30];
+  const BASE_IDS = new Set([
+    'power-ultimate', 'power-balanced', 'power-no-usb-suspend', 'power-no-disk-sleep',
+    'power-lid-nothing', 'power-sleep-never', 'power-no-auto-hibernate',
+    'vis-no-peek', 'vis-no-anim', 'vis-no-blur', 'vis-transparency-off', 'vis-no-toggle-keys',
+    'adv-no-delivery-opt', 'adv-no-bg-apps', 'adv-no-activity', 'adv-no-clipboard-hist',
+    'adv-no-xbox-bar', 'debloat-visual-fx', 'debloat-disk-cleanup',
+    'debloat-no-hibernate', 'cpu-no-hibernate',
+    'sys-boot-legacy', 'sys-minidump', 'sys-no-bsod-reboot',
+    'net-ecn-on', 'net-no-tunnel', 'net-adapter-restart', 'ram-standby-task',
+    'game-bg-apps-off', 'net-timed-wait', 'net-max-user-port',
+  ]);
+  const EXTREME_IDS = new Set([
+    'game-no-hpet', 'cpu-no-dynamictick', 'cpu-tsc-enhanced', 'cpu-no-spec-mit',
+    'cpu-x2apic', 'cpu-timer-res',
+    'priv-lsa', 'priv-credential-guard', 'debloat-edge',
+    'priv-no-rdp', 'priv-no-smb1', 'net-reset-stack',
+  ]);
+  function tierOf(id) {
+    const meta = TWEAKS[id];
+    if (meta && meta.free) return 0;
+    if (BASE_IDS.has(id)) return 1;
+    if (EXTREME_IDS.has(id)) return 3;
+    return 2;
+  }
+  function tierStats() {
+    const ids = Object.keys(TWEAKS);
+    const c = [0, 0, 0, 0];
+    ids.forEach((id) => c[tierOf(id)]++);
+    return {
+      total: ids.length, free: c[0], base: c[1], pro: c[2], extreme: c[3],
+      cumBase: c[0] + c[1], cumPro: c[0] + c[1] + c[2],
+    };
+  }
   /* Render a group of tweak cards into `container`.
    * Free users SEE every tweak (transparency builds trust) but Pro-only cards
    * get a 🔒 button that routes to Settings — no blanket overlays, so the
@@ -287,7 +353,8 @@
     for (const id of ids) {
       const meta = TWEAKS[id];
       if (!meta) continue;
-      const locked = !licenseState.pro && !meta.free;
+      const need = tierOf(id);
+      const locked = licenseState.tier < need;
       const card = document.createElement('div');
       card.className = 'tweak-card';
       card.dataset.tweak = id;
@@ -295,12 +362,14 @@
       info.className = 'tweak-info';
       const b = document.createElement('b');
       b.textContent = meta.t;
-      if (meta.free && !licenseState.pro) {
-        const tag = document.createElement('span');
-        tag.className = 'free-tag';
-        tag.textContent = 'FREE';
-        b.append(' ', tag);
-      }
+      // Tier badge ALWAYS visible: FREE (green) / BASE (blue) / PRO (gold) /
+      // EXTREME (red). This is the Free-vs-paid separation at a glance.
+      const tag = document.createElement('span');
+      if (need === 0) { tag.className = 'free-tag'; tag.textContent = 'FREE'; }
+      else if (need === 1) { tag.className = 'tier-tag tier-base'; tag.textContent = 'BASE'; }
+      else if (need === 3) { tag.className = 'tier-tag tier-extreme'; tag.textContent = 'EXTREME'; }
+      else { tag.className = 'pro-tag'; tag.textContent = 'PRO'; }
+      b.append(' ', tag);
       // OS badge: which Windows this tweak is for. 'both' (default) shows a
       // compact 10·11; win10/win11-only tweaks get an explicit label.
       const osv = meta.os || 'both';
@@ -317,10 +386,10 @@
       const applyBtn = document.createElement('button');
       if (locked) {
         applyBtn.className = 'btn secondary';
-        applyBtn.textContent = '🔒 Pro';
-        applyBtn.title = 'Requires TidalTweaks Pro';
+        applyBtn.textContent = `🔒 ${TIER_NAMES[need]}`;
+        applyBtn.title = `Requires TidalTweaks ${TIER_NAMES[need]} ($${TIER_PRICES[need]})`;
         applyBtn.onclick = () => {
-          toast(`🔒 '${meta.t}' needs Pro — opening Settings…`, 'gold', 3500);
+          toast(`🔒 '${meta.t}' needs ${TIER_NAMES[need]} ($${TIER_PRICES[need]}) — opening Settings…`, 'gold', 3500);
           switchTab('settings');
         };
       } else {
@@ -367,17 +436,20 @@
   }
 
   /* ------------------------------ license ------------------------------- */
-  const licenseState = { pro: false, activatedAt: null, apiUrl: '', cashapp: '', username: null, role: null };
+  const licenseState = { pro: false, tier: 0, activatedAt: null, apiUrl: '', cashapp: '', username: null, role: null };
 
   async function refreshLicense(celebrate) {
     try {
       const s = await api.license.status();
-      const wasPro = licenseState.pro;
+      const wasTier = licenseState.tier || 0;
       Object.assign(licenseState, s);
+      if (typeof licenseState.tier !== 'number') licenseState.tier = 0;
       const badge = $('#edition-badge');
-      badge.textContent = s.pro ? 'PRO 👑' : 'FREE';
-      badge.className = 'edition ' + (s.pro ? 'pro' : 'free');
-      document.body.classList.toggle('is-pro', !!s.pro);
+      const names = ['FREE', 'BASE', 'PRO 👑', 'EXTREME 👑'];
+      const classes = ['free', 'base', 'pro', 'pro'];
+      badge.textContent = names[licenseState.tier] || 'FREE';
+      badge.className = 'edition ' + (classes[licenseState.tier] || 'free');
+      document.body.classList.toggle('is-pro', licenseState.tier >= 2);
       // Lite mode: flat panels + no GPU compositing (see styles.css body.lite).
       document.body.classList.toggle('lite', !!s.lite);
       // Personal greeting (the Risxn "Welcome, User!" touch — we have accounts).
@@ -387,12 +459,18 @@
       // owner IPC call, so hiding here is UX, not security).
       const ownerBtn = $('#nav-owner');
       if (ownerBtn) ownerBtn.hidden = s.role !== 'owner';
-      // License flipped (activated or deactivated)? Re-render every tweak
-      // group so 🔒 buttons swap live without a restart.
-      if (s.pro !== wasPro) tweakRenders.forEach((g) => renderTweaks(g.container, g.ids, true));
-      if (s.pro && !wasPro && celebrate) {
+      // License UPGRADED? Re-render every tweak group so 🔒 buttons swap
+      // live without a restart + fire the unlock celebration.
+      if (licenseState.tier !== wasTier) {
+        tweakRenders.forEach((g) => renderTweaks(g.container, g.ids, true));
+        // Library page builds wholesale (search text) — rebuild it too.
+        if (window.TT && window.TT._rebuildLibrary) {
+          try { window.TT._rebuildLibrary(); } catch (e) { /* next show rebuilds */ }
+        }
+      }
+      if (licenseState.tier > wasTier && celebrate) {
         confettiBurst(); // the unlock celebration
-        toast('Pro unlocked — all tweaks available. 🎉', 'gold', 5000);
+        toast(`${TIER_NAMES[licenseState.tier]} unlocked — enjoy. 🎉`, 'gold', 5000);
       }
       return s;
     } catch (e) {
@@ -456,7 +534,7 @@
   }
 
   /* ------------------------------ router --------------------------------- */
-  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'gaming',
+  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'gaming',
     'registry', 'debloat', 'privacy', 'power', 'restore', 'settings', 'owner'];
   let current = 'dashboard';
 
@@ -558,10 +636,13 @@
   // Public surface for tabs/*.js (TWEAKS lets presets.js print stack contents).
   window.TT = {
     toast, confirm: confirmAction, confetti: confettiBurst,
-    fmtBytes, fmtUptime, countUp, TWEAKS,
+    fmtBytes, fmtUptime, countUp, TWEAKS, TIER_NAMES, TIER_PRICES,
+    tierOf, tierStats,
     renderTweaks, applyTweak, revertTweak,
     refreshLicense, switchTab,
-    get pro() { return licenseState.pro; },
+    get pro() { return licenseState.tier >= 2; }, // legacy: "pro content" gate
+    get tier() { return licenseState.tier || 0; },
+    get tierName() { return TIER_NAMES[licenseState.tier] || 'Free'; },
     get api() { return api; },
     _show: {}, // tabs register onShow callbacks: TT._show.ram = fn
   };

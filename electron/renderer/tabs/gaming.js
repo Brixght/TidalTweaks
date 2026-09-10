@@ -22,7 +22,7 @@
     'game-bg-apps-off',
   ]);
   TT.renderTweaks(document.querySelector('[data-tweaks="gpu-vendor"]'), [
-    'gpu-nv-telemetry', 'gpu-msi-mode', 'gpu-amd-ulps',
+    'gpu-nv-telemetry', 'gpu-msi-mode', 'gpu-amd-ulps', 'gpu-no-mpo',
   ]);
 
   /* ---- Per-game priority (FREE): the user's own exe list ---- */
@@ -83,6 +83,18 @@
   $('priority-boost').onclick = async () => {
     const r = await TT.api.game.boostList(games).catch((e) => ({ ok: false, message: String(e) }));
     TT.toast((r && r.message) || 'Boost failed.', r && r.ok ? 'success' : 'error', 4500);
+  };
+  // Discrete-GPU forcing reads the SAME saved list server-side (Pro).
+  const gpuBtn = $('priority-gpu');
+  if (gpuBtn) gpuBtn.onclick = async () => {
+    const ok = await TT.confirm({
+      title: 'Force discrete GPU?',
+      body: `Writes GpuPreference=2 (high performance) for all ${games.length} saved game(s).\nLaptops stop launching them on the iGPU.\nPrevious per-game values are captured for undo.`,
+      okText: 'Force discrete GPU',
+    });
+    if (!ok) return;
+    const r = await TT.api.game.gpuPref().catch((e) => ({ ok: false, message: String(e) }));
+    TT.toast((r && r.message) || 'Failed.', r && r.ok ? 'success' : 'error', 5000);
   };
   loadGames();
 })();

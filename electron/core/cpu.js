@@ -247,10 +247,23 @@ async function timerResolutionOn() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Disable OS-level deep idle (C-states) via powercfg IDLEDISABLE=1: cores
+ * never park into deep sleep — steadier frame times, warmer idle. */
+async function disableIdleStates() {
+  try {
+    const prev = await powerGet('54533251-82be-4824-96c1-47b60b740d00', '5d76a2ca-e8c0-402f-a133-2158492d58c8');
+    const r = await runCmd('powercfg', ['-setacvalueindex', 'SCHEME_CURRENT', '54533251-82be-4824-96c1-47b60b740d00', '5d76a2ca-e8c0-402f-a133-2158492d58c8', '1'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'powercfg failed (admin?)' };
+    await runCmd('powercfg', ['-setactive', 'SCHEME_CURRENT'], 30000);
+    return { ok: true, message: 'Deep CPU idle states disabled (AC).', revert: { kind: 'powercfg', sub: '54533251-82be-4824-96c1-47b60b740d00', setting: '5d76a2ca-e8c0-402f-a133-2158492d58c8', prev } };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   setBoostMode, disableThrottling, disableInterruptSteering,
   enableTimerSerialization, disableEnergyEstimation, disableCoreParking,
   disableHibernation, setMinProcessorState100, disablePcieLinkState,
   biosClockUTC, setForegroundPriority, disableDynamicTick, tscSyncEnhanced,
   disableSpeculativeMitigations, enableX2Apic, timerResolutionOn, killTimerHolder,
+  disableIdleStates,
 };

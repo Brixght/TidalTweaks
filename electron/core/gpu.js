@@ -161,7 +161,41 @@ module.exports = {
   disableFullscreenOptimizations, enableGamingMode,
   disableNvidiaTelemetry, enableMSIModeGPU, disableAMDULPS, boostSavedGames,
   windowsGameModeOn, mouseRawInput, keyboardFastRepeat,
+  disableMPO, preferDiscreteGPU,
 };
+
+/* Multiplane Overlay off (OverlayTestMode=5): Microsoft's documented
+ * workaround for flicker/stutter on some GPU+monitor combos. If nothing
+ * changes for you, revert — MPO helps battery life on laptops. */
+async function disableMPO() {
+  try {
+    const r = await regSetDword('HKLM', 'SOFTWARE\\Microsoft\\Windows\\Dwm', 'OverlayTestMode', 5);
+    return r.ok
+      ? { ok: true, message: 'Multiplane Overlay disabled — reboot to judge.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Force HIGH-PERFORMANCE GPU per saved game exe (laptops that wrongly pick
+ * the iGPU): writes GpuPreference=2 into DirectX UserGpuPreferences.
+ * Previous per-exe values are captured for true undo. */
+async function preferDiscreteGPU(names) {
+  try {
+    const { regSetString } = require('./exec');
+    const clean = [...new Set((names || []).map((n) => String(n).trim()))]
+      .filter((n) => /^[\w\-. ]{1,60}\.exe$/i.test(n))
+      .slice(0, 20);
+    if (!clean.length) return { ok: false, message: 'No game exes saved yet.' };
+    const base = 'Software\\Microsoft\\DirectX\\UserGpuPreferences';
+    const reverts = [];
+    for (const exe of clean) {
+      const r = await regSetString('HKCU', base, exe, 'GpuPreference=2;');
+      if (!r.ok) return { ok: false, message: `Failed on ${exe}` };
+      reverts.push(r.revert);
+    }
+    return { ok: true, message: `Discrete GPU forced for ${clean.length} game(s).`, revert: reverts };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
 
 /* Windows Game Mode ON (the real one — reduces background activity for the
  * foreground game). Distinct from Game Bar/DVR, which stay OFF. */

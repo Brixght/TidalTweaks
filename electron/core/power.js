@@ -117,8 +117,40 @@ async function disableModernStandby() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Lid close = do nothing (AC only): for docked laptops driving monitors.
+ * Bag-carriers beware — your laptop stays ON when you shut it. */
+async function lidCloseNothing() {
+  try {
+    const r = await powerSet('4f971e89-eebd-4455-a8de-9e59040e7347', '5ca83367-6e45-459f-a27b-476b1d01c0a', 0);
+    return r.ok
+      ? { ok: true, message: 'Lid close → do nothing (on AC).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Sleep timeout → never (AC): for downloads, servers, long renders. */
+async function sleepNever() {
+  try {
+    const r = await powerSet('238c9fa8-0aad-41ed-83f4-97be242c8f20', '29f6c1db-86da-48c5-9fdb-f2b67b1f44da', 0);
+    return r.ok
+      ? { ok: true, message: 'Sleep disabled on AC (screen may still dim).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Auto-hibernate timeout → never: sleep stays sleep, no surprise hiberfil. */
+async function noAutoHibernate() {
+  try {
+    const r = await powerSet('238c9fa8-0aad-41ed-83f4-97be242c8f20', '94ac6d29-73a4-41a6-809d-63a15c97f4b5', 0);
+    return r.ok
+      ? { ok: true, message: 'Auto-hibernate off.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   unlockUltimatePerformance, setHighPerformance, setBalancedPlan,
   disableUSBSelectiveSuspend, disableDiskSleep,
   setMinProcessorState100, disablePcieLinkState, disableModernStandby,
+  lidCloseNothing, sleepNever, noAutoHibernate,
 };

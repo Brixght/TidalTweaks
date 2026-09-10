@@ -129,6 +129,11 @@ async function applyRevert(d) {
         await require('./cpu').killTimerHolder();
         return { ok: true, message: 'Timer-resolution holder stopped.' };
       }
+      case 'schtask': { // delete our scheduled task + its script file
+        await runCmd('schtasks', ['/delete', '/tn', d.name, '/f'], 30000);
+        try { require('node:fs').rmSync(d.script, { force: true }); } catch { /* gone already */ }
+        return { ok: true, message: `Scheduled task '${d.name}' removed.` };
+      }
       case 'regkey': { // whole-key backup: delete the key we created
         await runCmd('reg', ['delete', `${d.root}\\${d.path}`, '/f'], 15000);
         return { ok: true, message: 'Registry key removed.' };

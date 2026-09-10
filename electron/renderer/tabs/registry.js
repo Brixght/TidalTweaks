@@ -10,9 +10,11 @@
     'cpu-no-hibernate', 'cpu-min-state-100', 'cpu-no-pcie-link',
     'cpu-bios-utc', 'cpu-fg-priority', 'cpu-no-dynamictick',
     'cpu-tsc-enhanced', 'cpu-no-spec-mit', 'cpu-x2apic', 'cpu-timer-res',
+    'cpu-no-idle-states',
   ]);
   TT.renderTweaks(q('system'), [
     'sys-verbose-boot', 'sys-bsod-details', 'sys-fast-shutdown', 'sys-storage-sense',
+    'sys-boot-legacy', 'sys-minidump', 'sys-no-bsod-reboot',
   ]);
   TT.renderTweaks(q('disk'), ['disk-no-lastaccess', 'disk-no-8dot3']);
   // Free visual/advanced teasers get their own clearly-labelled subgroups.

@@ -156,6 +156,37 @@ async function enableCredentialGuard() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Camera kill-switch (enterprise policy): apps get black frames. */
+async function disableCamera() {
+  try {
+    const r = await regSetDword('HKLM', 'SOFTWARE\\Policies\\Microsoft\\Windows\\Camera', 'AllowCamera', 0);
+    return r.ok
+      ? { ok: true, message: 'Camera blocked system-wide (breaks video calls).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Microphone kill-switch (enterprise policy): apps get silence. */
+async function disableMicrophone() {
+  try {
+    const r = await regSetDword('HKLM', 'SOFTWARE\\Policies\\Microsoft\\Windows\\Microphone', 'AllowMicrophone', 0);
+    return r.ok
+      ? { ok: true, message: 'Microphone blocked system-wide (breaks voice chat).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* USB storage blocked (USBSTOR Start=4): thumb drives stop mounting.
+ * Keyboards/mice keep working — only MASS STORAGE is gated. */
+async function blockUSBStorage() {
+  try {
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Services\\USBSTOR', 'Start', 4);
+    return r.ok
+      ? { ok: true, message: 'USB storage devices blocked. Reboot to enforce.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   disableTelemetry, disableAdId, disableTailoredExperiences,
   disableAppSuggestions, disableCortanaData, disableLocation,
@@ -163,6 +194,7 @@ module.exports = {
   enableLSAProtection, enableCredentialGuard,
   disableLLMNR, disableSMB1, denyInboundRDP, disableAutoPlay,
   disableRecallAI, disableCEIP, disableInkCollection, disableFeedbackPrompts,
+  disableCamera, disableMicrophone, blockUSBStorage,
 };
 
 /* LLMNR off: stops multicast name-resolution leaks (responder-attack vector). */

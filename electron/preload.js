@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('api', {
   // — Saved-games priority boost (Free) —
   game: {
     boostList: (names) => ipcRenderer.invoke('game:boost-list', { names }),
+    gpuPref: () => ipcRenderer.invoke('game:gpu-pref'),
   },
 
   // — Restore points + undo (available to everyone) —

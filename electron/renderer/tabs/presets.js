@@ -25,8 +25,9 @@
       const h = document.createElement('h3');
       h.textContent = p.title + '  ';
       const tag = document.createElement('span');
-      tag.className = p.pro ? 'pro-tag' : 'free-tag';
-      tag.textContent = p.pro ? 'PRO' : 'FREE';
+      const pt = p.tier || 0;
+      tag.className = pt === 0 ? 'free-tag' : (pt === 1 ? 'tier-tag tier-base' : (pt === 3 ? 'tier-tag tier-extreme' : 'pro-tag'));
+      tag.textContent = (TT.TIER_NAMES[pt] || 'FREE').toUpperCase();
       h.appendChild(tag);
       const desc = document.createElement('p');
       desc.className = 'dim';
@@ -53,9 +54,10 @@
       row.className = 'row';
       row.style.marginBottom = '0';
       const btn = document.createElement('button');
-      const locked = p.pro && !TT.pro;
-      btn.className = 'btn ' + (locked ? 'secondary' : (p.pro ? 'gold' : 'primary'));
-      btn.textContent = locked ? '🔒 Pro' : `⚡ Apply ${(p.ids || []).length} tweaks`;
+      const need = p.tier || 0;
+      const locked = TT.tier < need;
+      btn.className = 'btn ' + (locked ? 'secondary' : (need >= 2 ? 'gold' : 'primary'));
+      btn.textContent = locked ? `🔒 ${TT.TIER_NAMES[need]}` : `⚡ Apply ${(p.ids || []).length} tweaks`;
       btn.onclick = () => applyPreset(p, locked);
       row.appendChild(btn);
       card.append(h, desc, sub, ul, row);
@@ -64,8 +66,9 @@
   }
 
   async function applyPreset(p, locked) {
+    const need = p.tier || 0;
     if (locked) {
-      TT.toast(`🔒 '${p.title}' needs Pro — opening Settings…`, 'gold', 3500);
+      TT.toast(`🔒 '${p.title}' needs ${TT.TIER_NAMES[need]} ($${TT.TIER_PRICES[need]}) — opening Settings…`, 'gold', 3500);
       TT.switchTab('settings');
       return;
     }

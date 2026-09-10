@@ -189,8 +189,62 @@ async function resetStack() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Explicit Congestion Notification on: better behavior on lossy/bufferbloated
+ * paths (hotel Wi-Fi, congested nodes). Reversible, default is off. */
+async function ecnOn() {
+  try {
+    const r = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'ecncapability=enabled'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'ECN enabled.',
+      revert: { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', 'ecncapability=disabled'], label: 'ECN back to disabled.' },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Receive Segment Coalescing off: trades a little throughput for lower,
+ * steadier latency (classic competitive tweak). Reversible. */
+async function rscOff() {
+  try {
+    const r = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'rsc=disabled'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'RSC disabled (latency over bulk throughput).',
+      revert: { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', 'rsc=enabled'], label: 'RSC re-enabled.' },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Dead transition tech off (Teredo/6to4/ISATAP): less attack surface, fewer
+ * weird tunnels. NOTE: Xbox party chat uses Teredo — gamers read the modal. */
+async function tunnelsOff() {
+  try {
+    await runPS('netsh interface teredo set state disabled | Out-Null; netsh interface 6to4 set state disabled | Out-Null; netsh interface ipv6 isatap set state disabled | Out-Null', 60000);
+    return {
+      ok: true, message: 'Teredo/6to4/ISATAP disabled.',
+      revert: { kind: 'cmdline', file: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', 'netsh interface teredo set state type=default | Out-Null'], label: 'Teredo back to default (6to4/ISATAP stay off).' },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Restart every UP adapter (disable → enable): the "have you tried turning
+ * the network off and on" button. 5–10s blip, no reboot. */
+async function adapterRestart() {
+  try {
+    const r = await runPS(
+      '$n = Get-NetAdapter -Physical | Where-Object { $_.Status -eq "Up" }; if (-not $n) { Write-Output "NONE" } else { $n | Disable-NetAdapter -Confirm:$false; Start-Sleep -Seconds 3; $n | Enable-NetAdapter -Confirm:$false; Write-Output ("OK:" + (($n | Select-Object -ExpandProperty Name) -join ",")) }',
+      120000
+    );
+    const out = r.stdout || '';
+    if (out.includes('NONE')) return { ok: false, message: 'No active physical adapters found.' };
+    const names = (/OK:(.+)/.exec(out) || [])[1]?.trim() || 'adapters';
+    return { ok: true, message: `Restarted: ${names}. Give it ~10s to reconnect.`, revert: { kind: 'none' } };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   ping, dnsLookup, setTimedWaitDelay, setMaxUserPort, flushDNS,
   setCloudflareDNS, setGoogleDNS, disableSMBBandwidthLimit,
   nicPowersaveOff, nicEcoOff, qosLimitZero, resetStack,
+  ecnOn, rscOff, tunnelsOff, adapterRestart,
 };

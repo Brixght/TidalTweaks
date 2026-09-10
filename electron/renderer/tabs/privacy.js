@@ -12,23 +12,30 @@
     'priv-lsa', 'priv-credential-guard', // both carry reboot warnings
     'priv-no-llmnr', 'priv-no-smb1', 'priv-no-rdp',
     'priv-no-recall', 'priv-no-ceip', 'priv-no-ink-collection',
+    'priv-no-camera', 'priv-no-mic', 'priv-no-usb-storage',
   ];
   TT.renderTweaks(document.querySelector('[data-tweaks="privacy"]'), PRIV_IDS);
 
   document.getElementById('privacy-all').onclick = async () => {
-    if (!TT.pro) { // bulk action is Pro-only even though cards show locks
-      TT.toast('🔒 Harden-all needs Pro — opening Settings…', 'gold', 3500);
+    if (TT.tier < 2) { // bulk action is Pro-only even though cards show locks
+      TT.toast('🔒 Harden-all needs Pro ($15) — opening Settings…', 'gold', 3500);
       TT.switchTab('settings');
       return;
     }
+    // Extreme items (LSA, Credential Guard) are skipped unless owned —
+    // no point showing "denied" toasts for things the tier system already labels.
+    const mine = PRIV_IDS.filter((id) => TT.tierOf(id) <= TT.tier);
+    const skipped = PRIV_IDS.filter((id) => TT.tierOf(id) > TT.tier);
     const ok = await TT.confirm({
       title: 'Harden all privacy settings?',
-      body: `${PRIV_IDS.length} tweaks will be applied (telemetry, ad ID, location, hosts block, services, LSA, Credential Guard).\nA restore point is created first.\nLSA / Credential Guard need a REBOOT.`,
+      body: `${mine.length} tweaks will be applied (telemetry, ad ID, location, hosts block, services${mine.includes('priv-lsa') ? ', LSA, Credential Guard' : ''}).\nA restore point is created first.` +
+        (mine.includes('priv-lsa') ? '\nLSA / Credential Guard need a REBOOT.' : '') +
+        (skipped.length ? `\n\nSkipped (needs ${[...new Set(skipped.map((id) => TT.TIER_NAMES[TT.tierOf(id)]))].join('/')}): ${skipped.length} item(s) — apply them individually after upgrading.` : ''),
       okText: 'Harden all',
     });
     if (!ok) return;
     let done = 0;
-    for (const id of PRIV_IDS) {
+    for (const id of mine) {
       try {
         const r = await TT.api.tweak.apply(id);
         if (r && r.ok) {
@@ -38,8 +45,9 @@
         } else TT.toast(`${id}: ${(r && r.message) || 'failed'}`, 'error');
       } catch (e) { TT.toast(`${id}: ${String(e)}`, 'error'); }
     }
-    TT.toast(`Privacy hardening: ${done}/${PRIV_IDS.length} applied.`,
-      done === PRIV_IDS.length ? 'success' : '', 5000);
+    TT.toast(`Privacy hardening: ${done}/${mine.length} applied.` +
+      (skipped.length ? ` (${skipped.length} Extreme skipped.)` : ''),
+      done === mine.length ? 'success' : '', 5000);
     if (TT.refreshRestore) TT.refreshRestore();
   };
 })();

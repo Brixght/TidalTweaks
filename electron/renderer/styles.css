@@ -309,6 +309,17 @@ body.is-pro .nav-item .crown { filter: none; opacity: 1; }
   background: linear-gradient(135deg, var(--success), #c0f5d4);
   padding: 2px 8px; border-radius: 12px; vertical-align: 2px; white-space: nowrap;
 }
+/* Tier badges (paid tiers mirror the pricing panel). */
+.tier-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  padding: 2px 8px; border-radius: 12px; vertical-align: 2px; white-space: nowrap;
+}
+.tier-base { color: #0D2140; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); }
+.tier-extreme { color: #fff; background: linear-gradient(135deg, #c0392b, var(--error)); }
+.edition.base {
+  color: #0D2140; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45);
+}
 /* OS badge: which Windows a tweak/preset targets. Subtle on purpose. */
 .os-tag {
   font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--faint);

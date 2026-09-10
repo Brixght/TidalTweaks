@@ -102,6 +102,7 @@
   TT.renderTweaks(document.querySelector('[data-tweaks="net"]'),
     ['net-timed-wait', 'net-max-user-port',
      'net-fast-dns-cloudflare', 'net-fast-dns-google', 'net-no-smb-limit',
-     'net-nic-powersave-off', 'net-nic-eco-off', 'net-reset-stack']);
+     'net-nic-powersave-off', 'net-nic-eco-off', 'net-reset-stack',
+     'net-ecn-on', 'net-rsc-off', 'net-no-tunnel', 'net-adapter-restart']);
   drawGraph();
 })();

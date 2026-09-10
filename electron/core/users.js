@@ -26,11 +26,14 @@ function hash(pw, salt) {
 }
 /** Strip secrets before anything crosses IPC to the renderer. Also migrates
  * the pre-rename 'admin' role to 'owner' on read (your existing account
- * keeps working — no data migration needed). */
+ * keeps working — no data migration needed). Tier defaults to 0 (Free);
+ * legacy boolean pro:true migrates to tier 2 (Pro). */
 function safe(u) {
   if (!u) return null;
+  const tier = typeof u.tier === 'number' ? u.tier : (u.pro ? 2 : 0);
   return {
-    username: u.username, role: u.role === 'admin' ? 'owner' : u.role, pro: !!u.pro,
+    username: u.username, role: u.role === 'admin' ? 'owner' : u.role, tier,
+    pro: tier >= 2,
     activatedAt: u.activatedAt || null, createdAt: u.createdAt || null,
   };
 }
@@ -149,16 +152,26 @@ function changePassword(username, oldPw, newPw) {
   return { ok: true, message: 'Password changed.' };
 }
 
-/* Attach a validated Pro code to an account (called after KV validation). */
-function setPro(username, code) {
+/* Attach a validated tier to an account (called after KV validation).
+ * tier: 1 Base, 2 Pro, 3 Extreme. Upgrades stack upward only — a Pro code
+ * never demotes an Extreme account. */
+function setTier(username, tier, code) {
   const list = all();
   const u = list.find((x) => x.username.toLowerCase() === String(username || '').toLowerCase());
   if (!u) return { ok: false, message: 'User not found.' };
-  u.pro = true;
+  const cur = typeof u.tier === 'number' ? u.tier : (u.pro ? 2 : 0);
+  const next = Math.max(cur, Math.min(3, Math.max(0, Number(tier) || 0)));
+  u.tier = next;
+  u.pro = next >= 2; // legacy compat flag (harmless duplicate of tier>=2)
   u.code = code;
   u.activatedAt = new Date().toISOString();
   saveAll(list);
   return { ok: true, user: safe(u) };
+}
+
+/* Attach a validated Pro code to an account (called after KV validation). */
+function setPro(username, code) {
+  return setTier(username, 2, code);
 }
 
 module.exports = {
@@ -203,11 +216,12 @@ function ownerVerifyPass(pass) {
   }
 }
 
-/* Remove Pro from an account (Settings → Deactivate). */
+/* Remove Pro from an account (Settings → Deactivate): back to Free (tier 0). */
 function clearPro(username) {
   const list = all();
   const u = list.find((x) => x.username.toLowerCase() === String(username || '').toLowerCase());
   if (!u) return { ok: false, message: 'User not found.' };
+  u.tier = 0;
   u.pro = false;
   u.code = null;
   u.activatedAt = null;

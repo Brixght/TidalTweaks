@@ -115,6 +115,7 @@ const TWEAK_REGISTRY = {
   'cpu-no-spec-mit': cpuTweaks.disableSpeculativeMitigations,
   'cpu-x2apic': cpuTweaks.enableX2Apic,
   'cpu-timer-res': cpuTweaks.timerResolutionOn,
+  'cpu-no-idle-states': cpuTweaks.disableIdleStates,
   // — Gaming & latency (core/gpu.js) —
   'game-power-ultimate': powerTweaks.unlockUltimatePerformance,
   'game-bar-off': gamingTweaks.disableGameBar,
@@ -127,6 +128,7 @@ const TWEAK_REGISTRY = {
   'game-no-fs-optim': gamingTweaks.disableFullscreenOptimizations,
   'game-mode-master': gamingTweaks.enableGamingMode,
   'game-bg-apps-off': advancedTweaks.disableBackgroundApps,
+  'ram-standby-task': ram.standbyTaskOn,
   'game-mode-win-on': gamingTweaks.windowsGameModeOn,
   'game-mouse-raw': gamingTweaks.mouseRawInput,
   'game-keyboard-fast': gamingTweaks.keyboardFastRepeat,
@@ -134,6 +136,10 @@ const TWEAK_REGISTRY = {
   'gpu-nv-telemetry': gamingTweaks.disableNvidiaTelemetry,
   'gpu-msi-mode': gamingTweaks.enableMSIModeGPU,
   'gpu-amd-ulps': gamingTweaks.disableAMDULPS,
+  'gpu-no-mpo': gamingTweaks.disableMPO,
+  // Per-saved-list discrete-GPU forcing has its own IPC (needs the exe list);
+  // the registry entry below only explains that when poked directly.
+  'game-discrete-gpu': gamingTweaks.preferDiscreteGPU,
   // — Network & internet (core/network.js) —
   'net-timed-wait': netTweaks.setTimedWaitDelay,
   'net-max-user-port': netTweaks.setMaxUserPort,
@@ -141,6 +147,14 @@ const TWEAK_REGISTRY = {
   'net-fast-dns-cloudflare': netTweaks.setCloudflareDNS,
   'net-fast-dns-google': netTweaks.setGoogleDNS,
   'net-no-smb-limit': netTweaks.disableSMBBandwidthLimit,
+  'net-nic-powersave-off': netTweaks.nicPowersaveOff,
+  'net-nic-eco-off': netTweaks.nicEcoOff,
+  'net-qos-limit': netTweaks.qosLimitZero,
+  'net-reset-stack': netTweaks.resetStack,
+  'net-ecn-on': netTweaks.ecnOn,
+  'net-rsc-off': netTweaks.rscOff,
+  'net-no-tunnel': netTweaks.tunnelsOff,
+  'net-adapter-restart': netTweaks.adapterRestart,
   'net-nic-powersave-off': netTweaks.nicPowersaveOff,
   'net-nic-eco-off': netTweaks.nicEcoOff,
   'net-qos-limit': netTweaks.qosLimitZero,
@@ -164,9 +178,14 @@ const TWEAK_REGISTRY = {
   'priv-no-ceip': privacyTweaks.disableCEIP,
   'priv-no-ink-collection': privacyTweaks.disableInkCollection,
   'priv-no-feedback': privacyTweaks.disableFeedbackPrompts,
+  'priv-no-camera': privacyTweaks.disableCamera,
+  'priv-no-mic': privacyTweaks.disableMicrophone,
+  'priv-no-usb-storage': privacyTweaks.blockUSBStorage,
   // — Debloat & cleanup (core/debloat.js) —
   'debloat-onedrive': debloatTweaks.removeOneDrive,
   'debloat-chrome-bg': debloatTweaks.chromeBackgroundOff,
+  'debloat-cortana-app': debloatTweaks.removeCortanaApp,
+  'debloat-xbox-app': debloatTweaks.removeXboxApp,
   'debloat-edge': debloatTweaks.removeEdge,
   'debloat-visual-fx': debloatTweaks.disableVisualEffects,
   'debloat-no-hibernate': debloatTweaks.disableHibernation,
@@ -192,6 +211,11 @@ const TWEAK_REGISTRY = {
   'vis-no-lockscreen': visualTweaks.noLockScreen,
   'vis-no-login-blur': visualTweaks.noLogonBlur,
   'vis-taskbar-left': visualTweaks.taskbarLeft,
+  'vis-classic-clock': visualTweaks.classicClock,
+  'vis-no-taskbar-search': visualTweaks.hideTaskbarSearch,
+  'vis-taskbar-seconds': visualTweaks.taskbarSeconds,
+  'vis-classic-alttab': visualTweaks.classicAltTab,
+  'vis-no-shake': visualTweaks.noWindowShake,
   // — Power (core/power.js) —
   'power-ultimate': powerTweaks.unlockUltimatePerformance,
   'power-balanced': powerTweaks.setBalancedPlan,
@@ -201,6 +225,9 @@ const TWEAK_REGISTRY = {
   'power-cpu-min-100': powerTweaks.setMinProcessorState100,
   'power-no-pcie': powerTweaks.disablePcieLinkState,
   'power-no-modern-standby': powerTweaks.disableModernStandby,
+  'power-lid-nothing': powerTweaks.lidCloseNothing,
+  'power-sleep-never': powerTweaks.sleepNever,
+  'power-no-auto-hibernate': powerTweaks.noAutoHibernate,
   // — System boot & behavior + NTFS (core/system.js) —
   'sys-verbose-boot': systemTweaks.verboseBoot,
   'sys-bsod-details': systemTweaks.bsodDetails,
@@ -208,6 +235,9 @@ const TWEAK_REGISTRY = {
   'sys-storage-sense': systemTweaks.storageSense,
   'disk-no-lastaccess': systemTweaks.noLastAccess,
   'disk-no-8dot3': systemTweaks.no8dot3,
+  'sys-boot-legacy': systemTweaks.bootMenuLegacy,
+  'sys-minidump': systemTweaks.miniDumps,
+  'sys-no-bsod-reboot': systemTweaks.noAutoRebootBSOD,
   // — Advanced (core/advanced.js) —
   'adv-no-indexing': advancedTweaks.disableSearchIndexing,
   'adv-no-sysmain': advancedTweaks.disableSysMain,
@@ -439,21 +469,61 @@ const FREE_TWEAKS = new Set([
   'vis-no-thumbs-network', 'vis-this-pc', 'vis-no-login-blur', 'vis-taskbar-left',
   'adv-no-search-highlights',
   'sys-verbose-boot', 'sys-bsod-details', 'sys-fast-shutdown', 'sys-storage-sense',
+  'vis-classic-clock', 'vis-no-taskbar-search', 'vis-taskbar-seconds',
+  'vis-classic-alttab', 'vis-no-shake',
 ]);
 
 /* Device Manager latency disables (Pro). id comes from a fixed allow-list in
  * core/devices.js — arbitrary device ids are rejected there. */
 ipcMain.handle('tweak:device', (_e, { id, enabled }) => {
-  if (!proActive()) return { ok: false, message: 'Pro required.' };
+  if (!tierAtLeast(3)) return { ok: false, message: 'Device disables are Extreme-only ($30).' };
   return deviceTweaks.setDeviceEnabled(id, enabled !== false ? false : true);
 });
 ipcMain.handle('tweak:devices', () => deviceTweaks.listDevices());
 
 /* Who may use Pro right now? The LOGGED-IN account's flag, or the legacy
  * device-wide flag from before accounts existed (auto-migrated on login). */
-function proActive() {
+function accountTier() {
   const me = users.session();
-  return !!((me && me.pro) || store.get('pro'));
+  if (me && typeof me.tier === 'number') return me.tier;
+  if (store.get('pro')) return 2; // pre-tier legacy device flag counts as Pro
+  return 0;
+}
+const tierAtLeast = (n) => accountTier() >= n;
+const proActive = () => tierAtLeast(2); // legacy alias (debloat bulk actions)
+
+/* TIER MODEL — Free 0, Base $5, Pro $15, Extreme $30. Higher tiers unlock
+ * everything below plus their own set (cumulative). Canonical lists live
+ * HERE; the renderer mirrors them for badges/locks (audited in CI spirit by
+ * the check script — keep both sides identical).
+ *   FREE_TWEAKS: safe/declarative, no gate at all.
+ *   BASE_TWEAKS: everyday wins (power plans, visual, safe services/updates).
+ *   EXTREME_TWEAKS: boot-config, security trade-offs, destructive-adjacent.
+ *   default (listed nowhere): Pro. */
+const TIER_NAMES = ['Free', 'Base', 'Pro', 'Extreme'];
+const TIER_PRICES = [0, 5, 15, 30];
+const BASE_TWEAKS = new Set([
+  'power-ultimate', 'power-balanced', 'power-no-usb-suspend', 'power-no-disk-sleep',
+  'power-lid-nothing', 'power-sleep-never', 'power-no-auto-hibernate',
+  'vis-no-peek', 'vis-no-anim', 'vis-no-blur', 'vis-transparency-off', 'vis-no-toggle-keys',
+  'adv-no-delivery-opt', 'adv-no-bg-apps', 'adv-no-activity', 'adv-no-clipboard-hist',
+  'adv-no-xbox-bar', 'debloat-visual-fx', 'debloat-disk-cleanup',
+  'debloat-no-hibernate', 'cpu-no-hibernate',
+  'sys-boot-legacy', 'sys-minidump', 'sys-no-bsod-reboot',
+  'net-ecn-on', 'net-no-tunnel', 'net-adapter-restart', 'ram-standby-task',
+  'game-bg-apps-off', 'net-timed-wait', 'net-max-user-port',
+]);
+const EXTREME_TWEAKS = new Set([
+  'game-no-hpet', 'cpu-no-dynamictick', 'cpu-tsc-enhanced', 'cpu-no-spec-mit',
+  'cpu-x2apic', 'cpu-timer-res',
+  'priv-lsa', 'priv-credential-guard', 'debloat-edge',
+  'priv-no-rdp', 'priv-no-smb1', 'net-reset-stack',
+]);
+function tierOf(id) {
+  if (FREE_TWEAKS.has(id)) return 0;
+  if (BASE_TWEAKS.has(id)) return 1;
+  if (EXTREME_TWEAKS.has(id)) return 3;
+  return 2;
 }
 const requester = () => users.session(); // sanitized {username, role, ...} | null
 const isOwner = () => { const me = requester(); return !!(me && me.role === 'owner'); };
@@ -464,8 +534,9 @@ const isOwner = () => { const me = requester(); return !!(me && me.role === 'own
  * → append to undo log (core/backup.js) so Undo/Revert-All can roll it back.
  * ========================================================================== */
 ipcMain.handle('tweak:apply', async (_e, { id }) => {
-  if (!proActive() && !FREE_TWEAKS.has(id)) {
-    return { ok: false, message: 'This tweak requires TidalTweaks Pro.' };
+  const need = tierOf(id);
+  if (accountTier() < need) {
+    return { ok: false, message: `This tweak requires TidalTweaks ${TIER_NAMES[need]} ($${TIER_PRICES[need]}).` };
   }
   const fn = TWEAK_REGISTRY[id];
   if (typeof fn !== 'function') return { ok: false, message: `Unknown tweak: ${id}` };
@@ -482,8 +553,9 @@ ipcMain.handle('tweak:apply', async (_e, { id }) => {
 /* Revert a single tweak. Free tweaks stay revertable without Pro (a free
  * user must never be stranded with an un-undoable change). */
 ipcMain.handle('tweak:revert', async (_e, { id }) => {
-  if (!proActive() && !FREE_TWEAKS.has(id)) {
-    return { ok: false, message: 'This tweak requires TidalTweaks Pro.' };
+  // Free tweaks stay revertable without any tier (never strand a free user).
+  if (tierOf(id) !== 0 && accountTier() < tierOf(id)) {
+    return { ok: false, message: `Reverting this needs ${TIER_NAMES[tierOf(id)]} (your backup is kept).` };
   }
   try {
     return await backup.revertOne(id);
@@ -497,11 +569,22 @@ ipcMain.handle('tweak:revert', async (_e, { id }) => {
  * Per-tweak modals are replaced by a single preset confirm listing every
  * included tweak (renderer builds it from preset:list + the TT catalog).
  * ========================================================================== */
-ipcMain.handle('preset:list', () => ({ ok: true, presets: presets.list() }));
+/* Preset tier = the highest tier of anything inside (computed server-side,
+ * so the client can never downgrade a stack's requirement). */
+function presetTier(p) {
+  return Math.max(0, ...p.ids.map((tid) => tierOf(tid)));
+}
+ipcMain.handle('preset:list', () => ({
+  ok: true,
+  presets: presets.list().map((p) => ({ ...p, tier: presetTier(p), tierName: TIER_NAMES[presetTier(p)] })),
+}));
 ipcMain.handle('preset:apply', async (_e, { id }) => {
   const p = presets.get(String(id || ''));
   if (!p) return { ok: false, message: 'Unknown preset.' };
-  if (p.pro && !proActive()) return { ok: false, message: 'This preset requires TidalTweaks Pro.' };
+  const need = presetTier(p);
+  if (accountTier() < need) {
+    return { ok: false, message: `This preset requires TidalTweaks ${TIER_NAMES[need]} ($${TIER_PRICES[need]}).` };
+  }
   try {
     await backup.ensureRestorePoint(`TidalTweaks preset ${p.id}`);
     const reverts = [];
@@ -550,6 +633,17 @@ ipcMain.handle('preset:apply', async (_e, { id }) => {
 /* Boost the saved game list to High (Free — Gaming tab priority card). */
 ipcMain.handle('game:boost-list', (_e, { names }) => gamingTweaks.boostSavedGames(names || []));
 
+/* Force discrete GPU for the saved list (Pro — reads the same stored list,
+ * so the renderer never sends exes for this one). */
+ipcMain.handle('game:gpu-pref', async () => {
+  if (accountTier() < 2) return { ok: false, message: 'Discrete-GPU forcing needs Pro ($15).' };
+  const list = Array.isArray(store.get('priorityGames')) ? store.get('priorityGames') : [];
+  await backup.ensureRestorePoint('TidalTweaks game-discrete-gpu');
+  const r = await gamingTweaks.preferDiscreteGPU(list);
+  if (r && r.ok) backup.logChange({ id: 'game-discrete-gpu', at: new Date().toISOString(), revert: r.revert });
+  return r;
+});
+
 /* ==========================================================================
  * Safety: restore points + undo (Restore tab, available to everyone)
  * ========================================================================== */
@@ -595,8 +689,12 @@ ipcMain.handle('license:validate', async (_e, { code }) => {
     return { ok: false, message: `Bad server response (HTTP ${res.status}).` };
   }
   if (res.ok && data && data.valid === true) {
-    users.setPro(me.username, clean); // code is single-use: KV already deleted it
-    return { ok: true, message: `Pro activated for '${me.username}' — welcome to the fast lane.` };
+    // Per-tier codes: the KV VALUE names the tier ("base"|"pro"|"extreme").
+    // Legacy values ("1", "true", missing) mean Pro. Server is authoritative.
+    const rawTier = String((data && data.tier) || '').toLowerCase().trim();
+    const tier = rawTier === 'base' ? 1 : rawTier === 'extreme' ? 3 : 2;
+    users.setTier(me.username, tier, clean); // code is single-use: KV already deleted it
+    return { ok: true, message: `${TIER_NAMES[tier]} activated for '${me.username}' — welcome to the fast lane.` };
   }
   // Server returns { valid:false } with 400 for unknown/already-used codes.
   return { ok: false, message: 'Invalid or already used code.' };
@@ -604,8 +702,11 @@ ipcMain.handle('license:validate', async (_e, { code }) => {
 
 ipcMain.handle('license:status', () => {
   const me = users.session();
+  const tier = accountTier();
   return {
-    pro: proActive(),
+    pro: tier >= 2,
+    tier,
+    tierName: TIER_NAMES[tier] || 'Free',
     activatedAt: (me && me.activatedAt) || store.get('activatedAt') || null,
     apiUrl: apiUrl(),
     cashapp: CASHAPP_TAG,

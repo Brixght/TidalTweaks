@@ -79,7 +79,43 @@ async function no8dot3() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Legacy F8 boot menu (bootmenupolicy Legacy): the classic text menu with
+ * Safe Mode on F8 — for troubleshooters who miss it. */
+async function bootMenuLegacy() {
+  try {
+    const { runCmd } = require('./exec');
+    const r = await runCmd('bcdedit', ['/set', '{current}', 'bootmenupolicy', 'Legacy'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'bcdedit failed (run as admin).' };
+    return {
+      ok: true, message: 'Legacy F8 boot menu on.',
+      revert: { kind: 'bcdedit', args: ['/set', '{current}', 'bootmenupolicy', 'Standard'] },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Minidumps instead of full memory dumps: a crash writes KBs, not GBs. */
+async function miniDumps() {
+  try {
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Control\\CrashControl', 'CrashDumpEnabled', 3);
+    return r.ok
+      ? { ok: true, message: 'Crash dumps → minidump (256KB, not GBs).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* No auto-restart after a blue screen: stay on the error so you can read it
+ * (pairs with the technical-BSOD tweak). Hold the power button to reboot. */
+async function noAutoRebootBSOD() {
+  try {
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Control\\CrashControl', 'AutoReboot', 0);
+    return r.ok
+      ? { ok: true, message: 'No auto-reboot on blue screens.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   verboseBoot, bsodDetails, fastShutdown, storageSense,
   noLastAccess, no8dot3,
+  bootMenuLegacy, miniDumps, noAutoRebootBSOD,
 };

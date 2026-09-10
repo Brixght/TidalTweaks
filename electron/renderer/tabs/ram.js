@@ -46,6 +46,20 @@
 
   $('ram-go').onclick = optimize;
   $('ram-refresh').onclick = poll;
+  // Standby janitor (Base): scheduled 15-min trims. Goes through the normal
+  // tweak runner so it gets a restore point + undo entry like everything else.
+  const schedBtn = $('ram-schedule');
+  if (schedBtn) schedBtn.onclick = async () => {
+    const ok = await TT.confirm({
+      title: 'Schedule standby janitor?',
+      body: 'A "TidalTweaks Standby Cleaner" task will trim idle memory every 15 minutes.\nUndo (Restore tab) deletes the task AND its script.',
+      okText: 'Schedule',
+    });
+    if (!ok) return;
+    const r = await TT.api.tweak.apply('ram-standby-task').catch((e) => ({ ok: false, message: String(e) }));
+    TT.toast((r && r.message) || 'Failed.', r && r.ok ? 'success' : 'error', 5000);
+    if (r && r.ok && TT.refreshRestore) TT.refreshRestore();
+  };
   TT._show.ram = poll;
   poll();
 })();

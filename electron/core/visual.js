@@ -145,10 +145,41 @@ const taskbarLeft = () => wrap(async () => {
   return r.ok ? { ok: true, message: 'Taskbar aligned left (restart Explorer to see it).', revert: r.revert } : r;
 });
 
+/* Classic taskbar clock flyout (Win11): UseWin32TrayClockExperience=0. */
+const classicClock = () => wrap(async () => {
+  const r = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'UseWin32TrayClockExperience', 0);
+  return r.ok ? { ok: true, message: 'Classic clock flyout restored.', revert: r.revert } : r;
+});
+
+/* Hide the taskbar Search box (Win11): SearchboxTaskbarMode=0. Win+S works. */
+const hideTaskbarSearch = () => wrap(async () => {
+  const r = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Search', 'SearchboxTaskbarMode', 0);
+  return r.ok ? { ok: true, message: 'Taskbar search box hidden.', revert: r.revert } : r;
+});
+
+/* Seconds in the taskbar clock (Win11): SecondsInSystemClock=1. */
+const taskbarSeconds = () => wrap(async () => {
+  const r = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'SecondsInSystemClock', 1);
+  return r.ok ? { ok: true, message: 'Taskbar clock shows seconds.', revert: r.revert } : r;
+});
+
+/* Classic XP-style Alt+Tab switcher: AltTabSettings=1. */
+const classicAltTab = () => wrap(async () => {
+  const r = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer', 'AltTabSettings', 1);
+  return r.ok ? { ok: true, message: 'Classic Alt+Tab switcher on.', revert: r.revert } : r;
+});
+
+/* Aero Shake off: windows stop minimizing when you shake one. */
+const noWindowShake = () => wrap(async () => {
+  const r = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'DisallowShaking', 1);
+  return r.ok ? { ok: true, message: 'Aero Shake disabled.', revert: r.revert } : r;
+});
+
 module.exports = {
   setMenuDelay0, disableAeroPeek, disableWindowAnimations, disableBlur,
   setTransparencyOff, setTransparencyOn, showFileExtensions,
   showHiddenFiles, disableStickyKeys, disableToggleKeysAudio,
   classicContextMenu, enableEndTask, hideTaskView, hideChatIcon, numlockOnBoot,
   noNetworkThumbs, thisPCDefault, noLockScreen, noLogonBlur, taskbarLeft,
+  classicClock, hideTaskbarSearch, taskbarSeconds, classicAltTab, noWindowShake,
 };
