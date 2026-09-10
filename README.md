@@ -11,6 +11,17 @@ Go to [**Releases**](../../releases) and grab `TidalTweaks Setup X.Y.Z.exe`. No 
 
 > Windows SmartScreen will warn about an unknown publisher (no paid code-signing cert yet) → **More info → Run anyway**.
 
+## 🛡 Antivirus notice (please read — it's a false positive)
+
+**Yes, Windows Defender or VirusTotal may flag this app. No, it's not a virus.** I'm one person trying to help people speed up their PCs — there is nothing malicious in here, and you don't have to take my word for it:
+
+- **The entire source code is right here on GitHub.** Every PowerShell command, every registry value — read it all before you run anything.
+- **Why it flags:** this app legitimately does things that *look* like malware to heuristics — launching PowerShell, editing the registry, disabling services, editing the hosts file. Every PC optimizer and sysadmin tool on earth trips the same heuristics.
+- **What it never does:** no passwords or personal data leave your PC, no crypto miners, no backdoors, no autostart entries, no nagging. The only internet it uses is the license check (plus font loading). It even ships with an uninstaller.
+- **What to do:** on SmartScreen click *More info → Run anyway*. If Defender quarantines it, restore it and add an exclusion — then compare what it does against the source here.
+
+If anything ever behaves unexpectedly, open an Issue and I'll answer it publicly.
+
 ## ✨ Features
 
 **Free forever:** live Dashboard (CPU/RAM/GPU/disks), Junk Cleaner with file preview, Startup Manager, RAM Optimizer, Network Tools (ping graph, DNS), 40+ safe tweaks (Game Bar off, raw mouse, Copilot removal, classic context menu…), 8 one-click game presets (Fortnite, Valorant, Minecraft, Roblox, CoD, Apex, FiveM), restore points + undo, themes, local accounts.
