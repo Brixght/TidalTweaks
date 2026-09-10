@@ -1,0 +1,539 @@
+/* ============================================================================
+ * TidalTweaks — Tsunami glass theme
+ * ----------------------------------------------------------------------------
+ * WHY THIS LOOKS PREMIUM (and the old Tkinter UI couldn't):
+ *  - Glassmorphism: translucent panels + backdrop-filter: blur(20px), so the
+ *    background gradient glows through like Discord/Arc.
+ *  - EVERYTHING animates on the GPU: transitions and keyframes below all use
+ *    cubic-bezier(0.4, 0, 0.2, 1) at 200–400ms — sidebar glider, page
+ *    fade/slide, rings, bars, toasts, modal, button glows, toggles.
+ * Palette (must stay in sync with the Python version's theme):
+ *  bg gradient #12294B → #0D2140 → #081733 · panels #1B3B66 / #24487A
+ *  borders #33578C / #2A4A78 · accent #5B8DF6 · gold #E8B23A
+ *  success #86EFAC · error #F87171 · text #E7E9EE / #A9C0DD / #7C93B5
+ * ========================================================================== */
+
+:root {
+  --bg0: #12294B;
+  --bg1: #0D2140;
+  --bg2: #081733;
+  --panel: #1B3B66;
+  --panel2: #24487A;
+  --border: #33578C;
+  --border-dim: #2A4A78;
+  --accent: #5B8DF6;
+  --gold: #E8B23A;
+  --success: #86EFAC;
+  --error: #F87171;
+  --text: #E7E9EE;
+  --dim: #A9C0DD;
+  --faint: #7C93B5;
+  --glass: rgba(var(--glass-rgb), 0.6);
+  --glass-line: rgba(var(--accent-rgb), 0.15);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1); /* the one easing curve everywhere */
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: var(--text);
+  /* Layered gradients = depth behind the glass panels */
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(var(--accent-rgb), 0.22), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(232, 178, 58, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--bg0) 0%, var(--bg1) 55%, var(--bg2) 100%);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================ Custom titlebar ============================ */
+#titlebar {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  -webkit-app-region: drag; /* whole bar drags the frameless window */
+  background: rgba(var(--deep-rgb), 0.55);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-line);
+  z-index: 50;
+}
+.tb-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
+.tb-brand em { font-style: normal; color: var(--accent); }
+/* Hamburger + brand cluster. Only the button opts OUT of the drag region,
+   so the brand text still drags the window. */
+.tb-left { display: flex; align-items: center; gap: 6px; }
+#btn-nav { -webkit-app-region: no-drag; }
+#btn-nav svg { width: 16px; height: 16px; }
+.tb-wave { width: 24px; height: 24px; color: var(--accent); }
+.edition {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  padding: 3px 9px; border-radius: 20px;
+  transition: all 0.3s var(--ease);
+}
+.edition.free { color: var(--dim); border: 1px solid var(--border); background: rgba(51, 87, 140, 0.25); }
+.edition.pro {
+  color: #0D2140; background: linear-gradient(135deg, var(--gold), #f5cf6b);
+  box-shadow: 0 0 16px rgba(232, 178, 58, 0.55); /* celebratory glow */
+}
+.tb-controls { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+.tb-btn {
+  width: 40px; height: 30px; border: 0; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s var(--ease);
+}
+.tb-btn svg { width: 12px; height: 12px; }
+.tb-btn:hover { background: rgba(var(--accent-rgb), 0.22); color: #fff; }
+.tb-btn.danger:hover { background: var(--error); color: #fff; }
+
+/* ============================ Layout + sidebar =========================== */
+#layout { display: flex; height: calc(100% - 46px); }
+
+#sidebar {
+  width: 228px; min-width: 228px;
+  background: rgba(var(--deep-rgb), 0.5);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--glass-line);
+  display: flex; flex-direction: column;
+  padding: 14px 10px;
+  /* Hamburger collapse: slides left off-canvas in 300ms, content flexes in. */
+  transition: margin-left 0.3s var(--ease);
+}
+body.nav-hidden #sidebar { margin-left: -228px; }
+body.nav-hidden #nav-glider { opacity: 0; }
+#nav { position: relative; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
+
+/* The sliding highlight pill — JS moves it with translateY (GPU, 300ms). */
+#nav-glider {
+  position: absolute; left: 0; right: 0; top: 0; height: 42px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.35), rgba(var(--accent-rgb), 0.12));
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-radius: 10px;
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.25);
+  transition: transform 0.3s var(--ease), height 0.3s var(--ease);
+  pointer-events: none;
+}
+.nav-item {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 11px;
+  height: 42px; padding: 0 12px;
+  background: transparent; border: 0; border-radius: 10px;
+  color: var(--dim); font: 600 13.5px 'Inter', sans-serif; cursor: pointer;
+  transition: all 0.2s var(--ease);
+  text-align: left; width: 100%;
+}
+.nav-item svg {
+  width: 19px; height: 19px; min-width: 19px;
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: all 0.2s var(--ease);
+}
+.nav-item:hover { color: #fff; background: rgba(var(--accent-rgb), 0.12); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.18); }
+.nav-item.active { color: #fff; }
+.nav-item.active svg { color: var(--accent); filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.8)); }
+.nav-item .crown { margin-left: auto; font-style: normal; font-size: 12px; filter: grayscale(1); opacity: 0.6; }
+body.is-pro .nav-item .crown { filter: none; opacity: 1; }
+.nav-sep { display: flex; align-items: center; gap: 8px; margin: 12px 6px 5px; }
+.nav-sep span { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: var(--faint); }
+.nav-sep::after { content: ''; flex: 1; height: 1px; background: var(--border-dim); }
+.side-foot { padding: 10px; font-size: 11px; color: var(--faint); text-align: center; }
+
+/* ============================ Content + pages ============================ */
+#content { flex: 1; overflow-y: auto; padding: 26px 30px 60px; }
+.page { display: none; max-width: 980px; }
+/* Page transition: fade + slide-up, 220ms — the signature tab-switch feel. */
+.page.active { display: block; animation: pageIn 0.22s var(--ease); }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-head h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.3px; }
+.page-head p { color: var(--faint); font-size: 13px; margin: 3px 0 18px; }
+
+/* Glassmorphism card: translucent panel + 20px blur + faint accent border. */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.card { padding: 18px 20px; margin-bottom: 16px; }
+.card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.card h3:not(:first-child) { margin-top: 20px; }
+.grid { display: grid; gap: 16px; margin-bottom: 16px; }
+.grid.rings { grid-template-columns: 1fr 1fr 1.4fr; }
+.grid.two { grid-template-columns: 1fr 1fr; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.row.end { justify-content: flex-end; margin-bottom: 0; }
+.dim { color: var(--dim); font-size: 13px; }
+.pro-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #0D2140;
+  background: linear-gradient(135deg, var(--gold), #f5cf6b);
+  padding: 2px 8px; border-radius: 12px; vertical-align: 2px;
+}
+
+/* ============================ Rings / bars / numbers ===================== */
+.ring-card { text-align: center; position: relative; }
+.ring { width: 130px; height: 130px; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: rgba(var(--accent-rgb), 0.15); stroke-width: 10; }
+.ring-fg {
+  fill: none; stroke: url(#ringGrad); stroke: var(--accent); stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 326.73; /* 2πr, r=52 — JS sets dashoffset for the % */
+  stroke-dashoffset: 326.73;
+  transition: stroke-dashoffset 0.4s var(--ease); /* smooth ring sweep */
+  filter: drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.7));
+}
+.ring-fg.ram { stroke: var(--gold); filter: drop-shadow(0 0 6px rgba(232, 178, 58, 0.7)); }
+.ring-label { margin-top: -86px; margin-bottom: 64px; }
+.ring-label strong { display: block; font-size: 26px; font-weight: 800; }
+.ring-label span { font-size: 11px; letter-spacing: 2px; color: var(--faint); font-weight: 700; }
+.ring-sub { font-size: 12px; color: var(--dim); min-height: 32px; }
+.sys-card .kv { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(var(--accent-rgb), 0.12); font-size: 13px; }
+.sys-card .kv:last-child { border-bottom: 0; }
+.sys-card .kv span { color: var(--faint); }
+.sys-card .kv b { font-weight: 600; text-align: right; }
+.big-number { font-size: 38px; font-weight: 800; color: var(--accent); }
+
+.bar { height: 10px; border-radius: 6px; background: rgba(var(--deep-rgb), 0.7); overflow: hidden; margin: 10px 0; }
+.bar-fill {
+  height: 100%; width: 0%; border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6);
+  transition: width 0.4s var(--ease); /* animated bar fill */
+}
+.progress { height: 10px; border-radius: 6px; background: rgba(var(--deep-rgb), 0.7); overflow: hidden; margin: 12px 0; }
+.progress .fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+  transition: width 0.3s var(--ease);
+}
+
+/* ============================ Buttons / inputs / toggles ================ */
+.btn {
+  border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  padding: 9px 18px; font: 600 13px 'Inter', sans-serif; color: var(--text);
+  background: rgba(var(--panel2-rgb), 0.6);
+  transition: all 0.2s var(--ease); /* glow + lift on hover, shrink on click */
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.4); /* the glow */
+  border-color: var(--accent);
+}
+.btn:active:not(:disabled) { transform: scale(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, black), var(--accent)); border-color: transparent; color: #fff; }
+.btn.secondary { background: rgba(var(--panel2-rgb), 0.6); }
+.btn.danger { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.5); color: var(--error); }
+.btn.danger:hover:not(:disabled) { box-shadow: 0 0 18px rgba(248, 113, 113, 0.4); border-color: var(--error); }
+.btn.gold { background: linear-gradient(135deg, var(--gold), #f5cf6b); border-color: transparent; color: #0D2140; font-weight: 700; }
+.btn.gold:hover:not(:disabled) { box-shadow: 0 0 20px rgba(232, 178, 58, 0.55); border-color: transparent; }
+
+/* Soft pulse for the primary call-to-action when idle. */
+.btn.pulse { animation: btnPulse 2.4s var(--ease) infinite; }
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(var(--accent-rgb), 0.5); }
+  50% { box-shadow: 0 0 22px rgba(var(--accent-rgb), 0.55); }
+}
+
+.input {
+  flex: 1; min-width: 180px;
+  background: rgba(var(--deep-rgb), 0.7); border: 1px solid var(--border-dim);
+  border-radius: 10px; color: var(--text); padding: 9px 13px;
+  font: 500 13px 'Inter', sans-serif; outline: none;
+  transition: all 0.2s var(--ease);
+  user-select: text;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.35); }
+
+.check { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--dim); cursor: pointer; }
+.check input { display: none; }
+.check .box {
+  width: 18px; height: 18px; border-radius: 6px; border: 1px solid var(--border);
+  background: rgba(var(--deep-rgb), 0.7); transition: all 0.2s var(--ease);
+  position: relative;
+}
+.check input:checked + .box { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6); }
+.check input:checked + .box::after {
+  content: '✓'; position: absolute; inset: 0; color: #fff;
+  font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+}
+
+/* Animated toggle switch (Startup list, device list). */
+.toggle { position: relative; width: 44px; height: 24px; min-width: 44px; cursor: pointer; }
+.toggle input { display: none; }
+.toggle .track {
+  position: absolute; inset: 0; border-radius: 14px;
+  background: rgba(var(--deep-rgb), 0.8); border: 1px solid var(--border);
+  transition: all 0.25s var(--ease);
+}
+.toggle .track::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--faint);
+  transition: all 0.25s var(--ease); /* knob slides */
+}
+.toggle input:checked + .track { background: rgba(var(--accent-rgb), 0.4); border-color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45); }
+.toggle input:checked + .track::after { left: 22px; background: #fff; }
+
+/* ============================ Tweak cards ================================ */
+.tweak-card {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 10px; padding: 13px 15px; margin-bottom: 10px;
+  transition: all 0.2s var(--ease);
+}
+.tweak-card:hover { border-color: rgba(var(--accent-rgb), 0.4); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.15); }
+.tweak-info { flex: 1; }
+.tweak-info b { font-size: 13.5px; display: block; }
+.tweak-info p { font-size: 12px; color: var(--faint); margin-top: 3px; line-height: 1.45; }
+.tweak-actions { display: flex; gap: 8px; }
+.tweak-actions .btn { padding: 7px 14px; font-size: 12px; }
+.tweak-card.applied { border-color: rgba(134, 239, 172, 0.45); }
+.tweak-card.applied::after { content: '✓'; color: var(--success); font-weight: 800; }
+
+/* FREE badge on teaser tweaks usable without Pro. (Lockable cards no longer
+   use a blanket overlay — Pro-only cards show a 🔒 button instead.) */
+.lockable { position: relative; }
+.free-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #081733;
+  background: linear-gradient(135deg, var(--success), #c0f5d4);
+  padding: 2px 8px; border-radius: 12px; vertical-align: 2px; white-space: nowrap;
+}
+/* OS badge: which Windows a tweak/preset targets. Subtle on purpose. */
+.os-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--faint);
+  border: 1px solid var(--border-dim); padding: 2px 8px; border-radius: 12px;
+  vertical-align: 2px; white-space: nowrap;
+}
+
+/* ============================ Lists / misc =============================== */
+.file-list { max-height: 320px; overflow-y: auto; font-size: 13px; }
+.file-row { display: flex; justify-content: space-between; padding: 6px 4px; border-bottom: 1px solid rgba(var(--accent-rgb), 0.1); }
+.file-row span:last-child { color: var(--faint); font-variant-numeric: tabular-nums; }
+.startup-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid rgba(var(--accent-rgb), 0.1); }
+.startup-row .info { flex: 1; }
+.startup-row .info b { font-size: 13px; }
+.startup-row .info small { display: block; color: var(--faint); font-size: 11px; margin-top: 2px; word-break: break-all; }
+.badge { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 10px; background: rgba(var(--accent-rgb), 0.2); color: var(--dim); }
+#ping-graph { width: 100%; height: 140px; background: rgba(var(--deep-rgb), 0.6); border: 1px solid var(--border-dim); border-radius: 10px; margin: 10px 0; }
+.cashapp {
+  background: rgba(232, 178, 58, 0.08); border: 1px solid rgba(232, 178, 58, 0.4);
+  border-radius: 10px; padding: 14px 16px; margin: 12px 0;
+}
+.cash-tag { font-size: 22px; font-weight: 800; color: var(--gold); text-shadow: 0 0 18px rgba(232, 178, 58, 0.5); }
+/* Click-to-copy Discord contact (activation panel). */
+#discord-tag { cursor: pointer; color: var(--gold); border-bottom: 1px dashed rgba(232, 178, 58, 0.6); transition: all 0.2s var(--ease); }
+#discord-tag:hover { text-shadow: 0 0 12px rgba(232, 178, 58, 0.7); }
+.cashapp p { font-size: 13px; color: var(--dim); margin-top: 6px; line-height: 1.5; }
+.glow-gold { border-color: rgba(232, 178, 58, 0.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 26px rgba(232, 178, 58, 0.12); }
+
+/* Loading spinner: smooth keyframe rotation. */
+.spinner {
+  width: 34px; height: 34px; margin: 16px auto;
+  border: 3px solid rgba(var(--accent-rgb), 0.2); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================ Toasts (bottom-right) ====================== */
+#toast-root { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
+.toast {
+  min-width: 280px; max-width: 360px;
+  background: rgba(var(--glass-rgb), 0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-line); border-left: 4px solid var(--accent);
+  border-radius: 10px; padding: 12px 15px; font-size: 13px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: toastIn 0.3s var(--ease); /* slides + fades in */
+}
+.toast.success { border-left-color: var(--success); }
+.toast.error { border-left-color: var(--error); }
+.toast.gold { border-left-color: var(--gold); }
+.toast.out { animation: toastOut 0.25s var(--ease) forwards; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(60px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translateX(60px); }
+}
+
+/* ============================ Modal ====================================== */
+#modal-root { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; }
+#modal-root[hidden] { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(4, 10, 24, 0.6); backdrop-filter: blur(6px); animation: fadeIn 0.2s var(--ease); }
+.modal { position: relative; width: 460px; max-width: 90vw; padding: 24px; animation: modalIn 0.25s var(--ease); }
+.modal h3 { font-size: 17px; margin-bottom: 10px; }
+.modal p { font-size: 13px; line-height: 1.6; white-space: pre-line; }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================ Confetti (Pro unlock party) ================ */
+#confetti-root { position: fixed; inset: 0; pointer-events: none; z-index: 400; overflow: hidden; }
+.confetti {
+  position: absolute; top: -12px; width: 9px; height: 14px; border-radius: 2px;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  to { transform: translateY(105vh) rotate(720deg); opacity: 0.7; }
+}
+
+/* ============================ Scrollbars ================================= */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: content-box; }
+
+@media (max-width: 1100px) {
+  .grid.rings, .grid.two { grid-template-columns: 1fr; }
+}
+
+/* ============================ Boot splash ================================ */
+#boot {
+  position: fixed; inset: 0; z-index: 500;
+  display: flex; flex-direction: column; gap: 14px;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, var(--bg0) 0%, var(--bg1) 55%, var(--bg2) 100%);
+  color: var(--dim); font-size: 13px;
+}
+
+/* ============================ Lite mode ================================== */
+/* Low-end lifesaver: kills every backdrop-blur (the iGPU killer), flattens
+ * panels to solid colors, and drops glows/pulse. Toggled by body.lite, which
+ * app.js sets from license:status (auto-detected in main.js). Same layout,
+ * same app — just zero compositing cost. */
+body.lite .glass,
+body.lite #titlebar,
+body.lite #sidebar,
+body.lite .toast { backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Lite solids follow the theme via vars (previously hardcoded navy, which is
+ * why switching themes only recolored the background on low-end machines). */
+body.lite .glass { background: rgba(var(--glass-rgb), 0.92); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+body.lite #titlebar, body.lite #sidebar { background: rgba(var(--deep-rgb), 0.96); }
+body.lite .toast { background: rgb(var(--glass-rgb)); }
+body.lite .pro-lock { backdrop-filter: none; background: rgba(var(--deep-rgb), 0.94); }
+body.lite .modal-backdrop { backdrop-filter: none; background: rgba(4, 10, 24, 0.82); }
+body.lite .btn.pulse { animation: none; }
+body.lite .ring-fg { filter: none; }
+body.lite .bar-fill { box-shadow: none; }
+body.lite .btn:hover:not(:disabled) { box-shadow: none; }
+body.lite .nav-item:hover { box-shadow: none; }
+body.lite .edition.pro { box-shadow: none; }
+select.input { flex: 0 1 240px; }
+
+/* ============================ Theme engine ================================= */
+/* Settings → Appearance. Base triplets live here; body[data-theme] swaps the
+ * background/glass/deeplucidity per theme, body[data-accent] swaps the accent
+ * everywhere (rings, glider, buttons, glows all read these vars). Accent
+ * rules come last so an explicit accent pick always wins over the theme. */
+:root {
+  --accent-rgb: 91, 141, 246;
+  --glass-rgb: 27, 59, 102;
+  --deep-rgb: 8, 23, 51;
+  --panel2-rgb: 36, 72, 122;
+}
+/* Abyss — near-black navy, same blue accent. */
+body[data-theme="abyss"] {
+  --bg0: #0a1428; --bg1: #060c1a; --bg2: #02040a;
+  --glass-rgb: 13, 28, 56; --deep-rgb: 3, 7, 17; --panel2-rgb: 18, 38, 70;
+  --border: #27436e; --border-dim: #1a2c4e;
+}
+/* Royal — deep purple (native accent violet, paired in settings.js). */
+body[data-theme="royal"] {
+  --bg0: #1d1240; --bg1: #130c2c; --bg2: #0a0616;
+  --glass-rgb: 46, 30, 92; --deep-rgb: 14, 9, 30; --panel2-rgb: 56, 38, 108;
+  --border: #4c3a86; --border-dim: #372a63;
+}
+/* Emerald — deep green (native accent mint, paired in settings.js). */
+body[data-theme="emerald"] {
+  --bg0: #0a2e28; --bg1: #06211d; --bg2: #021210;
+  --glass-rgb: 14, 62, 54; --deep-rgb: 3, 22, 19; --panel2-rgb: 18, 74, 64;
+  --border: #1f5c50; --border-dim: #17453d;
+}
+body[data-accent="blue"] { --accent: #5B8DF6; --accent-rgb: 91, 141, 246; }
+body[data-accent="gold"] { --accent: #E8B23A; --accent-rgb: 232, 178, 58; }
+body[data-accent="violet"] { --accent: #9D7BFF; --accent-rgb: 157, 123, 255; }
+body[data-accent="mint"] { --accent: #34D399; --accent-rgb: 52, 211, 153; }
+body[data-accent="rose"] { --accent: #FB7185; --accent-rgb: 251, 113, 133; }
+body[data-accent="cyan"] { --accent: #22D3EE; --accent-rgb: 34, 211, 238; }
+body[data-accent="orange"] { --accent: #FB923C; --accent-rgb: 251, 146, 60; }
+body[data-accent="silver"] { --accent: #9AA3B2; --accent-rgb: 154, 163, 178; }
+
+/* Crimson — dark red. Native accent: rose. */
+body[data-theme="crimson"] {
+  --bg0: #230a0e; --bg1: #170608; --bg2: #0d0305;
+  --glass-rgb: 60, 16, 24; --deep-rgb: 22, 6, 10; --panel2-rgb: 74, 22, 32;
+  --border: #6e2a35; --border-dim: #4e1e27;
+}
+/* Sunset — warm ember dark. Native accent: orange. */
+body[data-theme="sunset"] {
+  --bg0: #241206; --bg1: #170b04; --bg2: #0e0603;
+  --glass-rgb: 66, 36, 16; --deep-rgb: 24, 14, 6; --panel2-rgb: 80, 44, 20;
+  --border: #7a4a22; --border-dim: #573318;
+}
+/* Arctic — full LIGHT theme. Text/deep/glass all invert; accent stays blue.
+ * Every text-carrying rule reads var(--text/--dim/--faint), so this just works. */
+body[data-theme="arctic"] {
+  --bg0: #e9eff8; --bg1: #dbe4f1; --bg2: #c7d3e6;
+  --text: #16233a; --dim: #43536e; --faint: #6b7a93;
+  --glass-rgb: 255, 255, 255; --deep-rgb: 255, 255, 255; --panel2-rgb: 210, 220, 236;
+  --border: #9db1cc; --border-dim: #bcc9dd;
+  --glass-line: rgba(30, 60, 120, 0.14);
+}
+/* Mono — grayscale slate. Native accent: silver. */
+body[data-theme="mono"] {
+  --bg0: #1a1d24; --bg1: #12141a; --bg2: #08090c;
+  --glass-rgb: 32, 36, 45; --deep-rgb: 10, 12, 16; --panel2-rgb: 42, 47, 58;
+  --border: #3d434f; --border-dim: #2b2f38;
+}
+/* Arctic + Lite: the navy lite solids would clash with the light theme. */
+body.lite[data-theme="arctic"] .glass { background: #f2f6fc; }
+body.lite[data-theme="arctic"] #titlebar,
+body.lite[data-theme="arctic"] #sidebar { background: #dde5f1; }
+body.lite[data-theme="arctic"] .toast { background: #f2f6fc; }
+
+/* Amber warning banner (24H2 compat notice, …). */
+.warn-banner {
+  background: rgba(232, 178, 58, 0.1);
+  border: 1px solid rgba(232, 178, 58, 0.45);
+  color: var(--gold);
+  border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
+}
+body[data-theme="arctic"] .warn-banner { color: #8a6d1c; background: rgba(232, 178, 58, 0.16); }
+
+/* ============================ Auth gate ==================================== */
+#auth-root {
+  position: fixed; inset: 0; z-index: 450;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; overflow-y: auto;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(var(--accent-rgb), 0.22), transparent 60%),
+    linear-gradient(160deg, var(--bg0) 0%, var(--bg1) 55%, var(--bg2) 100%);
+}
+#auth-root[hidden] { display: none; }
+.auth-card { width: 400px; max-width: 94vw; padding: 30px 28px; text-align: center; }
+.auth-card h2 { font-size: 24px; font-weight: 800; }
+.auth-card h2 em { font-style: normal; color: var(--accent); }
+.auth-logo { font-size: 42px; }
+.auth-tabs { display: flex; gap: 10px; margin: 16px 0; }
+.auth-tabs .btn { flex: 1; }
+#auth-login, #auth-signup { display: flex; flex-direction: column; gap: 10px; }
+#auth-login[hidden], #auth-signup[hidden] { display: none; }
+.auth-error { color: var(--error); font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+/* Optional text field inside the confirm modal (password resets, …). */
+#modal-input { width: 100%; margin: 12px 0 4px; }
+#modal-input[hidden] { display: none; }

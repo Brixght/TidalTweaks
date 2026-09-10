@@ -1,0 +1,60 @@
+{
+  "name": "tidaltweaks",
+  "productName": "TidalTweaks",
+  "version": "2.0.0",
+  "description": "TidalTweaks — Windows PC optimization and tweaking tool (Free + Pro)",
+  "main": "main.js",
+  "author": "TidalTweaks",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis",
+    "build-portable": "electron-builder --win portable",
+    "dist": "npm run build"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "systeminformation": "^5.22.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.tidaltweaks.app",
+    "productName": "TidalTweaks",
+    "copyright": "Copyright © 2026 TidalTweaks",
+    "afterPack": "./scripts/afterPack.js",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "renderer/**/*",
+      "core/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TidalTweaks",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "TidalTweaks-Portable-${version}.exe"
+    }
+  }
+}

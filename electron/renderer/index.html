@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<!--
+  TidalTweaks — app shell (Electron renderer, NO Node access here).
+  ----------------------------------------------------------------------------
+  WHY ELECTRON LOOKS BETTER THAN THE OLD TKINTER UI: this whole window is a
+  real Chromium page, so every animation below is GPU-composited CSS:
+  glassmorphism (backdrop-filter blur), 60fps cubic-bezier transitions,
+  SVG progress rings, count-up numbers, glow hovers. Tkinter could do none
+  of that — hence this rewrite.
+
+  TAB → FILE MAP (one JS file per tab, loaded at the bottom):
+    Dashboard  → tabs/dashboard.js   (Free)
+    Cleaner    → tabs/cleaner.js     (Free)
+    Startup    → tabs/startup.js     (Free)
+    RAM        → tabs/ram.js         (Free)
+    Network    → tabs/network.js     (Free ping/DNS + Pro internet tweaks)
+    Gaming     → tabs/gaming.js      (Pro: gaming & latency)
+    Tweaks     → tabs/registry.js    (Pro: CPU perf + Visual/UI + Advanced)
+    Debloat    → tabs/debloat.js     (Pro: AppX + devices + cleanup)
+    Privacy    → tabs/privacy.js     (Pro: privacy & security)
+    Power      → tabs/power.js       (Pro: power management)
+    Restore    → tabs/restore.js     (Free for all: restore points + undo)
+    Settings   → tabs/settings.js    (activation + app settings)
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Content-Security-Policy: no remote code except Google Fonts. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https:;">
+<title>TidalTweaks</title>
+<!-- Inter with system fallbacks (works offline if Google Fonts is blocked) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- Boot splash: plain HTML/CSS, visible instantly with no JS. app.js removes
+     it once the UI is up — if it never disappears, the renderer failed to
+     load, and this message says so instead of a blank white window. -->
+<div id="boot"><div class="spinner"></div><p>Loading TidalTweaks…</p></div>
+
+<!-- ======================= Auth gate (sign up / log in) =======================
+     Shown instead of the app shell until a device-local account signs in
+     (see core/users.js). First registered account becomes owner. -->
+<div id="auth-root" hidden>
+  <div class="auth-card glass">
+    <div class="auth-logo">🌊</div>
+    <h2>Tidal<em>Tweaks</em></h2>
+    <p class="dim">Sign in on this PC to continue.</p>
+    <div class="auth-tabs">
+      <button id="auth-tab-login" class="btn primary">Log In</button>
+      <button id="auth-tab-signup" class="btn secondary">Sign Up</button>
+    </div>
+    <div id="auth-login">
+      <input id="login-user" class="input" placeholder="Username" autocomplete="username" />
+      <input id="login-pass" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="login-go" class="btn primary">Log In</button>
+    </div>
+    <div id="auth-signup" hidden>
+      <input id="signup-user" class="input" placeholder="Username (3–20 letters/numbers/_)" autocomplete="username" />
+      <input id="signup-pass" class="input" type="password" placeholder="Password (4+ characters)" autocomplete="new-password" />
+      <input id="signup-pass2" class="input" type="password" placeholder="Repeat password" autocomplete="new-password" />
+      <button id="signup-go" class="btn gold">Create Account</button>
+      <p class="dim">The first account on this PC becomes the owner.</p>
+    </div>
+    <p id="auth-error" class="auth-error" hidden></p>
+  </div>
+</div>
+
+<!-- ======================= Custom titlebar (frameless window) =======================
+     -webkit-app-region: drag makes it act like a native title bar.
+     Buttons are no-drag so they stay clickable. Double-click toggles maximise. -->
+<header id="titlebar">
+  <div class="tb-left">
+    <button id="btn-nav" class="tb-btn" title="Menu" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 16 16"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <div class="tb-brand">
+    <svg viewBox="0 0 24 24" class="tb-wave" aria-hidden="true"><path d="M2 12c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 5-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M2 17c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 5-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M2 7c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 5-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".3"/></svg>
+    <span>Tidal<em>Tweaks</em></span>
+    <span id="edition-badge" class="edition free">FREE</span>
+    </div>
+  </div>
+  <div class="tb-controls">
+    <button id="btn-min" class="tb-btn" title="Minimize" aria-label="Minimize">
+      <svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <button id="btn-max" class="tb-btn" title="Maximize" aria-label="Maximize">
+      <svg viewBox="0 0 12 12" id="glyph-max"><rect x="2" y="2" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+      <svg viewBox="0 0 12 12" id="glyph-restore" hidden><path d="M4 1h7v7M8 3H1v8h7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    </button>
+    <button id="btn-close" class="tb-btn danger" title="Close" aria-label="Close">
+      <svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<div id="layout">
+  <!-- ======================= Sidebar =======================
+       The #nav-glider is an absolutely-positioned pill that JS slides
+       (transform: translateY) to the active item — the signature animation. -->
+  <aside id="sidebar">
+    <nav id="nav">
+      <div id="nav-glider" aria-hidden="true"></div>
+      <button class="nav-item active" data-tab="dashboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="cleaner">
+        <svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+        <span>Cleaner</span>
+      </button>
+      <button class="nav-item" data-tab="startup">
+        <svg viewBox="0 0 24 24"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c3-2 7-2 7-2s0 4-2 7l-7 7-5-5z"/><circle cx="15" cy="9" r="1.6"/></svg>
+        <span>Startup</span>
+      </button>
+      <button class="nav-item" data-tab="ram">
+        <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+        <span>RAM</span>
+      </button>
+      <button class="nav-item" data-tab="network">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/></svg>
+        <span>Network</span>
+      </button>
+      <button class="nav-item" data-tab="presets">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
+        <span>Presets</span>
+      </button>
+      <div class="nav-sep"><span>PRO</span></div>
+      <button class="nav-item" data-tab="gaming" data-pro="1">
+        <svg viewBox="0 0 24 24"><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01M17.3 5H6.7a4 4 0 00-3.9 3.1L1.5 13a3 3 0 005.2 2.9L9 13h6l2.3 2.9a3 3 0 005.2-2.9l-1.3-4.9A4 4 0 0017.3 5z"/></svg>
+        <span>Gaming</span><i class="crown">👑</i>
+      </button>
+      <button class="nav-item" data-tab="registry" data-pro="1">
+        <svg viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/></svg>
+        <span>Tweaks</span><i class="crown">👑</i>
+      </button>
+      <button class="nav-item" data-tab="debloat" data-pro="1">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>
+        <span>Debloat</span><i class="crown">👑</i>
+      </button>
+      <button class="nav-item" data-tab="privacy" data-pro="1">
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg>
+        <span>Privacy</span><i class="crown">👑</i>
+      </button>
+      <button class="nav-item" data-tab="power" data-pro="1">
+        <svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>
+        <span>Power</span><i class="crown">👑</i>
+      </button>
+      <div class="nav-sep"><span>SYSTEM</span></div>
+      <button class="nav-item" data-tab="restore">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9.5 9.5 0 00-7 3.3L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg>
+        <span>Restore</span>
+      </button>
+      <button class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3h0a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5h0a1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9v0a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        <span>Settings</span>
+      </button>
+      <button class="nav-item" data-tab="owner" id="nav-owner" hidden>
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M12 8v4M12 15h.01"/></svg>
+        <span>Owner</span>
+      </button>
+    </nav>
+    <div class="side-foot">v2.0 · Win 10/11</div>
+  </aside>
+
+  <!-- ======================= Content pages =======================
+       app.js toggles .active (fade + slide-up, 200ms). Each tab's JS file
+       owns everything inside its <section> and fills [data-bind] slots. -->
+  <main id="content">
+    <section class="page active" id="page-dashboard">
+      <div class="page-head"><h1 id="dash-title">Dashboard</h1><p>Live overview of this PC · refreshes every 2s</p></div>
+      <div id="compat-warn" class="warn-banner" hidden></div>
+      <div class="grid rings">
+        <div class="glass card ring-card">
+          <svg class="ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="ring-fg" id="ring-cpu" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="ring-label"><strong id="stat-cpu-pct">–</strong><span>CPU</span></div>
+          <div class="ring-sub" id="stat-cpu-model">…</div>
+        </div>
+        <div class="glass card ring-card">
+          <svg class="ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="ring-fg ram" id="ring-ram" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="ring-label"><strong id="stat-ram-pct">–</strong><span>RAM</span></div>
+          <div class="ring-sub" id="stat-ram-detail">…</div>
+        </div>
+        <div class="glass card sys-card">
+          <div class="kv"><span>GPU</span><b id="stat-gpu">…</b></div>
+          <div class="kv"><span>OS</span><b id="stat-os">…</b></div>
+          <div class="kv"><span>Build</span><b id="stat-build">…</b></div>
+          <div class="kv"><span>Uptime</span><b id="stat-uptime">…</b></div>
+        </div>
+      </div>
+      <div class="glass card"><h3>Disks</h3><div id="disk-list"></div></div>
+    </section>
+
+    <section class="page" id="page-cleaner">
+      <div class="page-head"><h1>Cleaner</h1><p>Preview everything before anything is deleted</p></div>
+      <div class="row">
+        <button class="btn primary" id="cleaner-scan">🔍&nbsp; Scan</button>
+        <button class="btn danger" id="cleaner-clean" disabled>🧹&nbsp; Clean selected</button>
+        <label class="check"><input type="checkbox" id="cleaner-recycle" checked /><span class="box"></span>Empty Recycle Bin too</label>
+      </div>
+      <div class="progress" id="cleaner-progress" hidden><div class="fill"></div></div>
+      <div class="glass card"><div id="cleaner-list" class="file-list"><p class="dim">Press Scan to analyse junk files.</p></div></div>
+      <div class="glass card result" id="cleaner-result" hidden></div>
+    </section>
+
+    <section class="page" id="page-startup">
+      <div class="page-head"><h1>Startup Manager</h1><p>Registry Run keys + Startup folders · disabling is reversible</p></div>
+      <div class="row"><button class="btn secondary" id="startup-refresh">↻&nbsp; Refresh</button></div>
+      <div class="glass card"><div id="startup-list"><p class="dim">Loading…</p></div></div>
+    </section>
+
+    <section class="page" id="page-ram">
+      <div class="page-head"><h1>RAM Optimizer</h1><p>Trim idle memory without closing apps</p></div>
+      <div class="glass card">
+        <div class="big-number" id="ram-big">–</div>
+        <p class="dim" id="ram-detail">…</p>
+        <div class="bar"><div class="bar-fill" id="ram-bar"></div></div>
+        <div class="row">
+          <button class="btn primary pulse" id="ram-go">⚡&nbsp; Optimize now</button>
+          <button class="btn secondary" id="ram-refresh">↻&nbsp; Refresh</button>
+        </div>
+        <p class="dim" id="ram-status"></p>
+      </div>
+    </section>
+
+    <section class="page" id="page-network">
+      <div class="page-head"><h1>Network Tools</h1><p>Ping, DNS and latency at a glance</p></div>
+      <div class="grid two">
+        <div class="glass card">
+          <h3>Ping test</h3>
+          <div class="row"><input id="ping-host" class="input" value="8.8.8.8" />
+          <button class="btn primary" id="ping-go">▶&nbsp; Ping</button></div>
+          <canvas id="ping-graph" width="520" height="140"></canvas>
+          <p class="dim" id="ping-out"></p>
+        </div>
+        <div class="glass card">
+          <h3>DNS lookup</h3>
+          <div class="row"><input id="dns-host" class="input" value="google.com" />
+          <button class="btn primary" id="dns-go">🔍&nbsp; Resolve</button></div>
+          <p class="dim" id="dns-out"></p>
+          <h3 style="margin-top:18px">Speed test</h3>
+          <p class="dim">Full bandwidth test coming soon — connection latency shown for now.</p>
+          <button class="btn secondary" id="lat-go">⚡&nbsp; Check latency</button>
+          <p class="dim" id="lat-out"></p>
+        </div>
+      </div>
+      <div class="glass card lockable" data-pro-group>
+        <h3>Free tools <span class="free-tag">FREE</span></h3>
+        <div class="tweak-list" data-tweaks="net-free"></div>
+        <h3>Internet tweaks <span class="pro-tag">PRO</span></h3>
+        <div class="tweak-list" data-tweaks="net"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-presets">
+      <div class="page-head"><h1>Preset Stacks 🎯</h1><p>One click, one restore point, one undo — transparent bundles</p></div>
+      <div id="preset-list"><p class="dim">Loading…</p></div>
+    </section>
+
+    <section class="page" id="page-gaming">
+      <div class="page-head"><h1>Gaming Mode 👑</h1><p>Lower latency, steadier frames</p></div>
+      <div class="glass card lockable" data-pro-group>
+        <h3>Free starter tweaks <span class="free-tag">FREE</span></h3>
+        <div class="tweak-list" data-tweaks="gaming-free"></div>
+        <h3>Pro performance <span class="pro-tag">PRO</span></h3>
+        <div class="tweak-list" data-tweaks="gaming"></div>
+        <h3>Graphics cards <span class="pro-tag">PRO</span></h3>
+        <div class="tweak-list" data-tweaks="gpu-vendor"></div>
+        <h3>Priority for my games <span class="free-tag">FREE</span></h3>
+        <p class="dim">Save your games' .exe names once — one click boosts every running match to High priority. Windows resets priorities on restart, so re-boost each session.</p>
+        <div class="row">
+          <input id="priority-exe" class="input" placeholder="e.g. FortniteClient-Win64-Shipping.exe" autocomplete="off" spellcheck="false" />
+          <button class="btn secondary" id="priority-add">Add</button>
+          <button class="btn primary" id="priority-boost">⚡&nbsp; Boost running now</button>
+        </div>
+        <div id="priority-list" class="file-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-registry">
+      <div class="page-head"><h1>System Tweaks 👑</h1><p>CPU, visual and advanced tweaks — each one reversible</p></div>
+      <div class="glass card lockable" data-pro-group>
+        <h3>Performance &amp; CPU <span class="pro-tag">PRO</span></h3><div class="tweak-list" data-tweaks="cpu"></div>
+        <h3>System boot &amp; behavior <span class="free-tag">FREE</span></h3><div class="tweak-list" data-tweaks="system"></div>
+        <h3>Filesystem (NTFS) <span class="pro-tag">PRO</span></h3><div class="tweak-list" data-tweaks="disk"></div>
+        <h3>Visual &amp; UI — free <span class="free-tag">FREE</span></h3><div class="tweak-list" data-tweaks="visual-free"></div>
+        <h3>Visual &amp; UI — pro <span class="pro-tag">PRO</span></h3><div class="tweak-list" data-tweaks="visual"></div>
+        <h3>Advanced system — free <span class="free-tag">FREE</span></h3><div class="tweak-list" data-tweaks="advanced-free"></div>
+        <h3>Advanced system — pro <span class="pro-tag">PRO</span></h3><div class="tweak-list" data-tweaks="advanced"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-debloat">
+      <div class="page-head"><h1>Debloater 👑</h1><p>Remove bloat, disable latency-heavy devices</p></div>
+      <div class="glass card lockable" data-pro-group>
+        <div class="row"><button class="btn secondary" id="debloat-scan">↻&nbsp; Scan installed</button>
+        <button class="btn danger" id="debloat-remove">🗑&nbsp; Remove selected</button></div>
+        <div id="debloat-list"><p class="dim">Press Scan to list bloatware.</p></div>
+        <h3>One-click removals</h3><div class="tweak-list" data-tweaks="debloat"></div>
+        <h3>Optional services <span class="pro-tag">PRO</span></h3>
+        <div class="tweak-list" data-tweaks="services"></div>
+        <h3>Device latency (optional disables)</h3><div id="device-list"><p class="dim">Loading devices…</p></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-privacy">
+      <div class="page-head"><h1>Privacy Hardening 👑</h1><p>Trackers off — hosts file backed up first</p></div>
+      <div class="glass card lockable" data-pro-group>
+        <div class="row"><button class="btn gold" id="privacy-all">🛡&nbsp; Harden all</button></div>
+        <div class="tweak-list" data-tweaks="privacy"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-power">
+      <div class="page-head"><h1>Power Management 👑</h1><p>Stop Windows throttling your hardware</p></div>
+      <div class="glass card lockable" data-pro-group><div class="tweak-list" data-tweaks="power"></div></div>
+    </section>
+
+    <section class="page" id="page-restore">
+      <div class="page-head"><h1>Safety &amp; Restore</h1><p>Restore points and undo — available to everyone</p></div>
+      <div class="glass card">
+        <div class="row">
+          <button class="btn primary" id="restore-create">🛡&nbsp; Create restore point</button>
+          <button class="btn secondary" id="restore-undo">↩&nbsp; Undo last tweak</button>
+          <button class="btn danger" id="restore-all">⟲&nbsp; Revert all changes</button>
+        </div>
+        <p class="dim" id="restore-status"></p>
+      </div>
+      <div class="glass card"><h3>Change history</h3><div id="restore-history"><p class="dim">No changes logged yet.</p></div></div>
+    </section>
+
+    <section class="page" id="page-owner">
+      <div class="page-head"><h1>Owner Panel 🛡</h1><p>Accounts on this PC — owner role + passphrase required</p></div>
+      <div class="grid two">
+        <div class="glass card"><h3>Users</h3><div class="big-number" id="owner-user-count">–</div></div>
+        <div class="glass card"><h3>Pro licenses</h3><div class="big-number" id="owner-pro-count">–</div></div>
+      </div>
+      <div class="glass card"><h3>Accounts</h3><div id="owner-users"><p class="dim">Loading…</p></div></div>
+    </section>
+
+    <section class="page" id="page-settings">
+      <div class="page-head"><h1>Settings</h1><p>Account, activation, appearance and about</p></div>
+      <div class="glass card">
+        <h3>Account</h3>
+        <p id="account-line" class="dim">…</p>
+        <div class="row">
+          <button class="btn secondary" id="account-change-pw">Change password</button>
+          <button class="btn secondary" id="account-logout">Log out</button>
+        </div>
+      </div>
+      <div class="glass card">
+        <h3>Appearance</h3>
+        <div class="row">
+          <label class="dim" for="theme-select">Theme</label>
+          <select id="theme-select" class="input">
+            <option value="tsunami">Tsunami (default)</option>
+            <option value="abyss">Abyss (darker)</option>
+            <option value="royal">Royal (purple)</option>
+            <option value="emerald">Emerald (green)</option>
+            <option value="crimson">Crimson (red)</option>
+            <option value="sunset">Sunset (orange)</option>
+            <option value="arctic">Arctic (light)</option>
+            <option value="mono">Mono (grayscale)</option>
+          </select>
+          <label class="dim" for="accent-select">Accent</label>
+          <select id="accent-select" class="input">
+            <option value="blue">Tidal Blue</option>
+            <option value="gold">Cash Gold</option>
+            <option value="violet">Violet</option>
+            <option value="mint">Mint</option>
+            <option value="rose">Rose</option>
+            <option value="cyan">Cyan</option>
+            <option value="orange">Ember Orange</option>
+            <option value="silver">Silver</option>
+          </select>
+        </div>
+        <p class="dim">Applies instantly. Lite mode (below) still overrides effects for speed.</p>
+      </div>
+      <div class="glass card glow-gold">
+        <h3>Activate Pro 👑</h3>
+        <p id="license-status" class="dim">Checking status…</p>
+        <div class="cashapp">
+          <div class="cash-tag">$AlwaysBetOnBright</div>
+          <p>1. Send payment to <b>$AlwaysBetOnBright</b> on Cash App.<br />
+             2. Add <b id="discord-tag" title="Click to copy">chrome.bright</b> on Discord and send your payment receipt.<br />
+             3. You'll get a one-time Pro code — paste it below to unlock.</p>
+        </div>
+        <div class="row">
+          <input id="license-code" class="input" placeholder="Paste Pro code here…" autocomplete="off" spellcheck="false" />
+          <button class="btn gold" id="license-go">Activate</button>
+        </div>
+        <div class="row">
+          <button class="btn secondary" id="license-check">Check activation status</button>
+          <button class="btn secondary" id="license-deactivate">Deactivate</button>
+        </div>
+        <div class="row"><input id="api-url" class="input" placeholder="License server URL" />
+        <button class="btn secondary" id="api-save">Save URL</button></div>
+      </div>
+      <div class="glass card">
+        <h3>Performance</h3>
+        <p class="dim">Lite mode trades glass blur for speed — recommended on low-end PCs. Auto-enables below 8GB RAM or 4 cores.</p>
+        <div class="row">
+          <select id="lite-mode" class="input">
+            <option value="auto">Auto (recommended)</option>
+            <option value="on">Lite always on</option>
+            <option value="off">Full glass always</option>
+          </select>
+        </div>
+        <p class="dim" id="lite-note"></p>
+      </div>
+      <div class="glass card">
+        <h3>Danger zone</h3>
+        <p class="dim">Restore every backup this app has saved (registry values, hosts file, services).</p>
+        <button class="btn danger" id="settings-revert-all">⟲&nbsp; Revert all changes</button>
+      </div>
+      <div class="glass card"><h3>About</h3>
+        <p class="dim">TidalTweaks v2.0 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Confirmation modal (backdrop blur + fade/scale-in). Content is injected by
+     app.js confirmAction(); every Pro tweak must go through it. -->
+<div id="modal-root" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal glass" role="dialog" aria-modal="true">
+    <h3 id="modal-title">Are you sure?</h3>
+    <p id="modal-body" class="dim"></p>
+    <!-- Optional text input (password resets etc.). Shown only when the
+         caller passes { input: true }; hidden otherwise. -->
+    <input id="modal-input" class="input" hidden autocomplete="off" spellcheck="false" />
+    <div class="row end">
+      <button class="btn secondary" id="modal-cancel">Cancel</button>
+      <button class="btn primary" id="modal-ok">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts slide in bottom-right (app.js). Pro unlock fires CSS confetti. -->
+<div id="toast-root" aria-live="polite"></div>
+<div id="confetti-root" aria-hidden="true"></div>
+
+<script src="app.js" defer></script>
+<script src="tabs/dashboard.js" defer></script>
+<script src="tabs/cleaner.js" defer></script>
+<script src="tabs/startup.js" defer></script>
+<script src="tabs/ram.js" defer></script>
+<script src="tabs/network.js" defer></script>
+<script src="tabs/gaming.js" defer></script>
+<script src="tabs/registry.js" defer></script>
+<script src="tabs/debloat.js" defer></script>
+<script src="tabs/privacy.js" defer></script>
+<script src="tabs/power.js" defer></script>
+<script src="tabs/presets.js" defer></script>
+<script src="tabs/restore.js" defer></script>
+<script src="tabs/settings.js" defer></script>
+<script src="tabs/owner.js" defer></script>
+</body>
+</html>
