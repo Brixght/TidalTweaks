@@ -70,7 +70,9 @@ verifies them fully offline — there is no backend to deploy, pay for, or maint
 - Your 300 starter codes live next to it (`SIGNED-*-codes.txt`, 100 per tier)
 - Mint more anytime, no internet needed:
   `node electron/scripts/mint-codes.js "<key-path>" <base|pro|extreme> <count> [out.txt]`
-- Each code activates **once, on that buyer's PC** (burned locally on claim).
+- Each code activates **once, on that buyer's PC** (burned locally on claim)
+  **and expires** (signed expiry date — shared codes rot instead of living
+  forever; mint with `--days=N`, default 30, bulk inventory at 365)
   Honest limit: two offline PCs can't compare notes, so a manually-shared code
   could activate a second machine. At $5–30 instant delivery, a non-issue.
 
