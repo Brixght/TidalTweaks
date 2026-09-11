@@ -86,12 +86,11 @@ contextBridge.exposeInMainWorld('api', {
     history: () => ipcRenderer.invoke('restore:history'),
   },
 
-  // — Activation (Cash App code → Cloudflare KV, see main.js for the flow) —
+  // — Activation (offline signed codes — see core/license.js, no network) —
   license: {
     validate: (code) => ipcRenderer.invoke('license:validate', { code }),
     status: () => ipcRenderer.invoke('license:status'),
     deactivate: () => ipcRenderer.invoke('license:deactivate'),
-    setApiUrl: (url) => ipcRenderer.invoke('license:set-api-url', { url }),
     setLite: (value) => ipcRenderer.invoke('license:set-lite', { value }),
   },
 

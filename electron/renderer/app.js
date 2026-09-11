@@ -436,7 +436,7 @@
   }
 
   /* ------------------------------ license ------------------------------- */
-  const licenseState = { pro: false, tier: 0, activatedAt: null, apiUrl: '', cashapp: '', username: null, role: null };
+  const licenseState = { pro: false, tier: 0, activatedAt: null, cashapp: '', username: null, role: null };
 
   async function refreshLicense(celebrate) {
     try {

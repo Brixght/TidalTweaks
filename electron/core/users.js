@@ -6,7 +6,7 @@
  * folder on THIS PC — there is no cloud server yet, so accounts don't roam
  * between machines. That's the right call for now: zero backend to run, zero
  * personal data leaves the device, and the Cash App code flow stays manual.
- * If cloud accounts are ever wanted, swap these functions for fetch() calls
+ * If cloud accounts are ever wanted, swap these functions for API calls
  * to a Worker — the IPC contract in main.js wouldn't have to change shape.
  *
  * Security: passwords are NEVER stored — only scrypt(salt, password) hashes.
@@ -152,7 +152,7 @@ function changePassword(username, oldPw, newPw) {
   return { ok: true, message: 'Password changed.' };
 }
 
-/* Attach a validated tier to an account (called after KV validation).
+/* Attach a validated tier to an account (called after code verification).
  * tier: 1 Base, 2 Pro, 3 Extreme. Upgrades stack upward only — a Pro code
  * never demotes an Extreme account. */
 function setTier(username, tier, code) {
@@ -169,14 +169,14 @@ function setTier(username, tier, code) {
   return { ok: true, user: safe(u) };
 }
 
-/* Attach a validated Pro code to an account (called after KV validation). */
+/* Attach a validated Pro code to an account (called after verification). */
 function setPro(username, code) {
   return setTier(username, 2, code);
 }
 
 module.exports = {
   signup, login, logout, session, list, setRole,
-  resetPassword, deleteUser, changePassword, setPro, clearPro,
+  resetPassword, deleteUser, changePassword, setPro, setTier, clearPro,
   ownerHasPass, ownerSetPass, ownerVerifyPass,
 };
 

@@ -13,9 +13,9 @@
  *   4. Own the Pro license state via electron-store (code + timestamp only —
  *      no personal data is ever stored).
  *
- * CONFIRMATION: no paid APIs and no payment processors are used anywhere.
- * Pro unlock is a manual Cash App payment; the only network call in the
- * entire app is the one-time license validation POST (see license:validate).
+ * CONFIRMATION: no paid APIs, no payment processors, no servers at all.
+ * Pro unlock is a manual Cash App payment for a signed offline code;
+ * the app makes ZERO license network calls (see license:validate).
  * ========================================================================== */
 
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
@@ -24,36 +24,19 @@ const os = require('node:os');
 const Store = require('electron-store');
 const si = require('systeminformation');
 
-/* --------------------------------------------------------------------------
- * ACTIVATION URL — how to update it after deploying Cloudflare Pages:
- *
- *   1. Deploy your Pages project (the validate-code function from the
- *      Python version's cloudflare-validate-code.example.js works unchanged —
- *      it only cares about receiving { code } and returning { valid }).
- *   2. Replace the string below with your real URL, e.g.
- *      'https://my-tweaks-site.pages.dev/api/validate-code'
- *   3. Rebuild with `npm run build`.
- *
- * Users can ALSO override it at runtime in Settings → License server URL,
- * which is persisted in electron-store and takes precedence over this value.
- * ------------------------------------------------------------------------ */
-const DEFAULT_API_URL = 'https://tidaltweaks.pages.dev/api/validate-code';
 const CASHAPP_TAG = '$AlwaysBetOnBright'; // shown in Settings, never sent anywhere
 
-/* electron-store: local persistence (replaces %APPDATA%/TidalTweaks/config.json
- * from the Python version). Only the code + timestamp are stored. */
+/* electron-store: local persistence. Only settings + local license state. */
 const store = new Store({
   defaults: {
     pro: false,
     code: null,
     activatedAt: null,
-    apiUrl: DEFAULT_API_URL,
     liteMode: 'auto', // 'auto' | 'on' | 'off' — see resolveLite()
     theme: 'tsunami',  // tsunami | abyss | royal | emerald (Settings → Appearance)
     accent: 'blue',    // blue | gold | violet | mint | rose
   },
 });
-const apiUrl = () => store.get('apiUrl') || DEFAULT_API_URL;
 
 /* LITE MODE — the low-end lifesaver (see fix notes at top of file).
  * 'auto' (default): enable when RAM < 8GB or ≤4 logical cores, detected with
@@ -653,51 +636,26 @@ ipcMain.handle('restore:revert-all', () => backup.revertAll());
 ipcMain.handle('restore:history', () => backup.history());
 
 /* ==========================================================================
- * Activation — same flow as the Python version, step by step:
- *   1. User pays manually via Cash App to $AlwaysBetOnBright and receives a
- *      one-time code (no payment code exists in this app at all).
- *   2. Renderer POSTs { code } to the Cloudflare Pages function
- *      (DEFAULT_API_URL, overridable in Settings).
- *   3. The Pages function looks the code up in KV: found → DELETES it
- *      permanently and returns { valid: true }; missing → { valid: false }
- *      with HTTP 400. Single-use is enforced server-side.
- *   4. On { valid: true } we persist { pro:true, code, activatedAt } in
- *      electron-store and unlock instantly. On failure we store nothing.
- * Node 18+ has a global fetch, so no HTTP library is needed.
+ * Activation — OFFLINE signed codes (no server, no Cloudflare, no network):
+ *   1. User pays manually via Cash App to $AlwaysBetOnBright, DMs the seller
+ *      on Discord with receipt + tier, receives a TT1-* code.
+ *   2. license:validate runs core/license.claimCode: Ed25519 signature check
+ *      (unforgeable) + per-machine single-use bookkeeping.
+ *   3. Tier attaches to the LOGGED-IN account; unlock is instant.
+ * No payment code and no license network call exist anywhere in this app.
  * ========================================================================== */
+const license = require('./core/license');
+
 ipcMain.handle('license:validate', async (_e, { code }) => {
-  const clean = String(code || '').trim();
-  if (!clean) return { ok: false, message: 'Please paste a code first.' };
-  // Pro attaches to the LOGGED-IN account (the auth gate guarantees one, but
+  // Tier attaches to the LOGGED-IN account (the auth gate guarantees one, but
   // never trust the renderer — verify again here).
   const me = users.session();
   if (!me) return { ok: false, message: 'Log in first, then activate.' };
-  let res;
   try {
-    res = await fetch(apiUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: clean }),
-    });
+    return license.claimCode(code, me.username);
   } catch (err) {
-    return { ok: false, message: `Could not reach license server: ${String((err && err.message) || err)}` };
+    return { ok: false, message: String((err && err.message) || err) };
   }
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, message: `Bad server response (HTTP ${res.status}).` };
-  }
-  if (res.ok && data && data.valid === true) {
-    // Per-tier codes: the KV VALUE names the tier ("base"|"pro"|"extreme").
-    // Legacy values ("1", "true", missing) mean Pro. Server is authoritative.
-    const rawTier = String((data && data.tier) || '').toLowerCase().trim();
-    const tier = rawTier === 'base' ? 1 : rawTier === 'extreme' ? 3 : 2;
-    users.setTier(me.username, tier, clean); // code is single-use: KV already deleted it
-    return { ok: true, message: `${TIER_NAMES[tier]} activated for '${me.username}' — welcome to the fast lane.` };
-  }
-  // Server returns { valid:false } with 400 for unknown/already-used codes.
-  return { ok: false, message: 'Invalid or already used code.' };
 });
 
 ipcMain.handle('license:status', () => {
@@ -708,7 +666,6 @@ ipcMain.handle('license:status', () => {
     tier,
     tierName: TIER_NAMES[tier] || 'Free',
     activatedAt: (me && me.activatedAt) || store.get('activatedAt') || null,
-    apiUrl: apiUrl(),
     cashapp: CASHAPP_TAG,
     lite: LITE, // effective lite mode (after auto-detection)
     litePref: store.get('liteMode') || 'auto',
@@ -835,10 +792,4 @@ ipcMain.handle('license:deactivate', () => {
   return { ok: true };
 });
 
-ipcMain.handle('license:set-api-url', (_e, { url }) => {
-  const clean = String(url || '').trim();
-  if (!/^https?:\/\/.+/i.test(clean)) return { ok: false, message: 'URL must start with http(s)://' };
-  store.set('apiUrl', clean);
-  return { ok: true, apiUrl: clean };
-});
 

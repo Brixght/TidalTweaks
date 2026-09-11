@@ -7,3 +7,8 @@ build/
 venv/
 
 node_modules/
+
+# NEVER commit license codes or the minting key
+*-codes.txt
+PRIVATE-KEY*
+*.pem

@@ -1,5 +1,5 @@
 'use strict';
-/* Settings tab: activation panel (Cash App code → Cloudflare KV), license
+/* Settings tab: activation panel (offline signed codes), license
  * server URL override, danger-zone revert-all, about.
  * On success: confetti + gold toast + instant unlock (see refreshLicense). */
 (function () {
@@ -15,7 +15,6 @@
     $('license-status').textContent = tier > 0
       ? `👑 ${tname} ACTIVE since ${(s.activatedAt || '').slice(0, 10)} — ${tier >= 3 ? 'everything' : 'all ' + tname + ' and below'} unlocked.`
       : 'FREE version — pick a tier below to unlock more tweaks.';
-    $('api-url').value = s.apiUrl || '';
     $('account-line').textContent = s.username
       ? `Signed in as ${s.username} (${s.role}) · ${tname}${tier >= 2 ? ' 👑' : ''}.`
       : 'Not signed in.';
@@ -117,12 +116,7 @@
     await TT.api.license.deactivate().catch(() => {});
     await TT.refreshLicense(false);
     paint();
-    TT.toast('Pro deactivated — back to Free.', '', 3000);
-  };
-  $('api-save').onclick = async () => {
-    const r = await TT.api.license.setApiUrl($('api-url').value).catch((e) => ({ ok: false, message: String(e) }));
-    TT.toast(r && r.ok ? 'License server URL saved.' : ('Invalid URL: ' + ((r && r.message) || '')), r && r.ok ? 'success' : 'error');
-    paint();
+    TT.toast('Deactivated — back to Free.', '', 3000);
   };
   const liteSel = $('lite-mode');
   if (liteSel) liteSel.onchange = async () => {

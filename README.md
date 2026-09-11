@@ -59,20 +59,20 @@ npm.cmd run build    # → electron/dist/TidalTweaks Setup X.Y.Z.exe
 > `npm` may be blocked by PowerShell's execution policy — use `npm.cmd`, or run
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-## 🔑 Activation server (for the seller — API only, no website needed)
+## 🔑 License codes (for the seller — offline, no server, no Cloudflare)
 
-The app validates codes against one Cloudflare Pages Function backed by KV.
-Everything deploy-ready lives in [`cloudflare/`](cloudflare/) (function +
-`wrangler.toml` + step-by-step guide) — full instructions in
-[`cloudflare/README.md`](cloudflare/README.md). Short version:
+Codes are **cryptographically signed** with your private Ed25519 key. The app
+verifies them fully offline — there is no backend to deploy, pay for, or maintain.
 
-1. Pages → Upload assets → drop the `cloudflare/` folder, name it `tidaltweaks`
-2. Bind a KV namespace called `CODES`, redeploy
-3. Bulk-upload your codes: `wrangler kv:bulk put --binding=CODES kv-import-base.json` (×3 tiers)
-4. Test with a garbage code (must return `{"valid":false}` — burns nothing)
-
-Name it `tidaltweaks` and the app needs zero configuration (that's its
-default URL). Any other name: paste it in the app's Settings → Save URL.
+- Your private key: `Documents\TidalTweaks-Codes\PRIVATE-KEY-do-not-share.pem`
+  (created once, **back it up on a USB stick** — lose it and you can never mint
+  more codes for this app version; leak it and anyone can mint unlimited codes)
+- Your 300 starter codes live next to it (`SIGNED-*-codes.txt`, 100 per tier)
+- Mint more anytime, no internet needed:
+  `node electron/scripts/mint-codes.js "<key-path>" <base|pro|extreme> <count> [out.txt]`
+- Each code activates **once, on that buyer's PC** (burned locally on claim).
+  Honest limit: two offline PCs can't compare notes, so a manually-shared code
+  could activate a second machine. At $5–30 instant delivery, a non-issue.
 
 ## 📁 Project layout
 
