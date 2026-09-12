@@ -213,6 +213,9 @@
     'vis-taskbar-seconds': { free: true, os: 'win11', t: 'Clock shows seconds', d: 'Taskbar clock with seconds precision.', m: 'Will set SecondsInSystemClock=1.' },
     'vis-classic-alttab': { free: true, os: 'both', t: 'Classic Alt+Tab switcher', d: 'XP-style icon grid instead of thumbnails.', m: 'Will set AltTabSettings=1.' },
     'vis-no-shake': { free: true, os: 'both', t: 'Aero Shake off', d: 'Shaking a window stops minimizing everything else.', m: 'Will set DisallowShaking=1.' },
+    'vis-no-shadows': { free: true, os: 'both', t: 'Icon + taskbar shadows off', d: 'One less compositing pass per frame for weak GPUs.', m: 'Will set ListviewShadow=0 and TaskbarAnimations=0.' },
+    'vis-no-drag-full': { free: true, os: 'both', t: 'Outlines while dragging', d: 'Windows stop repainting their contents mid-drag.', m: 'Will set DragFullWindows=0. You will see an outline instead of the live window.' },
+    'vis-fx-custom-min': { free: true, os: 'both', t: 'Micro-animation bundle off', d: 'Kills combobox, listbox, selection, tooltip + cursor shadows in one shot.', m: 'Will zero 5 animation values (ComboBox, ListBoxSmoothScrolling, SelectionFade, TooltipAnimation, CursorShadow).\nThe "uncheck everything" recipe, reversible.' },
     // ————— Advanced system —————
     'adv-no-indexing': { t: 'Disable Search indexing (WSearch)', d: 'Stops the indexer hammering your disk in the background.', m: 'Will stop and disable the WSearch service.\nStart-menu search still works, just slower on huge drives.' },
     'adv-no-sysmain': { t: 'Disable SysMain (Superfetch)', d: 'Great for SSDs — stops pointless prefetch disk churn.', m: 'Will stop and disable the SysMain service. Recommended on SSDs; HDD users may prefer to keep it.' },
@@ -273,6 +276,7 @@
     'power-lid-nothing': { os: 'both', t: 'Lid close = do nothing (AC)', d: 'For docked laptops driving external monitors.', m: 'Will set lid action to 0 on AC power only.\n⚠ Bag-carriers beware: closing the lid will NOT sleep a plugged-in laptop.' },
     'power-sleep-never': { os: 'both', t: 'Never sleep on AC', d: 'For downloads, servers and overnight renders.', m: 'Will set the sleep timeout to 0 (never) on AC.\nScreen may still dim — that is a separate timer.' },
     'power-no-auto-hibernate': { os: 'both', t: 'Never auto-hibernate', d: 'Sleep stays sleep — no surprise hiberfil writes.', m: 'Will set the hibernate-after timer to 0.' },
+    'power-active-cooling': { os: 'both', t: 'Active cooling policy', d: 'Fans ramp BEFORE clocks drop. For laptops that lose fps after 10 minutes.', m: 'Will set the cooling policy to Active on AC.\nLouder, faster, longer. If your fans already scream, this changes little.' },
     // ————— System boot & behavior (all Free) —————
     'sys-verbose-boot': { free: true, os: 'both', t: 'Verbose boot messages', d: 'See WHAT Windows is doing instead of spinning dots.', m: 'Will set VerboseStatus=1.' },
     'sys-bsod-details': { free: true, os: 'both', t: 'Technical BSODs', d: 'Blue screens show the stop code + driver instead of ":(".', m: 'Will set DisplayParameters=1. Invaluable the one time you need it.' },
@@ -309,6 +313,7 @@
   const BASE_IDS = new Set([
     'power-ultimate', 'power-balanced', 'power-no-usb-suspend', 'power-no-disk-sleep',
     'power-lid-nothing', 'power-sleep-never', 'power-no-auto-hibernate',
+    'power-active-cooling',
     'vis-no-peek', 'vis-no-anim', 'vis-no-blur', 'vis-transparency-off', 'vis-no-toggle-keys',
     'adv-no-delivery-opt', 'adv-no-bg-apps', 'adv-no-activity', 'adv-no-clipboard-hist',
     'adv-no-xbox-bar', 'debloat-visual-fx', 'debloat-disk-cleanup',
@@ -633,11 +638,82 @@
     if (boot) boot.remove();
   });
 
+  /* ------- preset progress overlay (the loading screen) -------
+   * Long applies (restore point + dozens of tweaks) finally narrate
+   * themselves: title → live step log with ✓/✗ → summary, instead of a
+   * silent freeze followed by one toast. Main-process step events feed the
+   * open session; renderer-driven loops (privacy harden-all) drive it
+   * manually through the same show/step/done calls. */
+  const progressSession = { open: false, id: null, total: 0, doneCount: 0 };
+  function progressShow(title, total, id) {
+    if (progressSession.open) return false; // one overlay at a time
+    progressSession.open = true;
+    progressSession.id = id || null;
+    progressSession.total = total || 0;
+    progressSession.doneCount = 0;
+    $('#progress-title').textContent = title || 'Working…';
+    $('#progress-sub').textContent = total
+      ? 'Do not close the app — a restore point was already created.'
+      : 'Working…';
+    $('#progress-fill').style.width = '0%';
+    $('#progress-log').innerHTML = '';
+    $('#progress-close').hidden = true;
+    $('#progress-root').hidden = false;
+    return true;
+  }
+  function progressLogLine(label, ok) {
+    const log = $('#progress-log');
+    const div = document.createElement('div');
+    div.className = 'plog-row' + (ok === true ? ' ok' : ok === false ? ' bad' : '');
+    div.textContent = (ok === true ? '✓ ' : ok === false ? '✗ ' : '• ') + label;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight; // follow the tail like a terminal
+  }
+  function progressStep(index, total, label, ok) {
+    if (!progressSession.open) return;
+    progressSession.doneCount++;
+    if (total) $('#progress-fill').style.width = Math.round((index / total) * 100) + '%';
+    $('#progress-sub').textContent = total ? `Step ${index} of ${total}…` : 'Working…';
+    progressLogLine(label, ok);
+  }
+  function progressDone(summary, success) {
+    if (!progressSession.open) return;
+    $('#progress-fill').style.width = '100%';
+    $('#progress-sub').textContent = summary || 'Done.';
+    const close = $('#progress-close');
+    close.hidden = false;
+    close.className = 'btn ' + (success === false ? 'danger' : 'primary');
+    close.onclick = progressHide;
+  }
+  function progressHide() {
+    progressSession.open = false;
+    progressSession.id = null;
+    $('#progress-root').hidden = true;
+  }
+  // Single persistent subscription: main-process step events land here and
+  // are routed to the open session (stale/other-preset events ignored).
+  try {
+    api.preset.onProgress((msg) => {
+      if (!progressSession.open || !msg || msg.preset !== progressSession.id) return;
+      if (msg.phase === 'restore') {
+        $('#progress-sub').textContent = 'Restore point secured — applying tweaks…';
+        progressLogLine('Restore point created', true);
+      } else if (msg.phase === 'step') {
+        const meta = (typeof TWEAKS !== 'undefined' && TWEAKS[msg.id]) || null;
+        progressStep(msg.index, msg.total, (meta && meta.t) || msg.id, msg.ok);
+      }
+    });
+  } catch (e) { /* preload bridge unreachable — overlay still works manually */ }
+  const progress = {
+    show: progressShow, step: progressStep, done: progressDone, hide: progressHide,
+    get open() { return progressSession.open; },
+  };
+
   // Public surface for tabs/*.js (TWEAKS lets presets.js print stack contents).
   window.TT = {
     toast, confirm: confirmAction, confetti: confettiBurst,
     fmtBytes, fmtUptime, countUp, TWEAKS, TIER_NAMES, TIER_PRICES,
-    tierOf, tierStats,
+    tierOf, tierStats, progress,
     renderTweaks, applyTweak, revertTweak,
     refreshLicense, switchTab,
     get pro() { return licenseState.tier >= 2; }, // legacy: "pro content" gate

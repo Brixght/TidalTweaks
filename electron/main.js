@@ -199,6 +199,9 @@ const TWEAK_REGISTRY = {
   'vis-taskbar-seconds': visualTweaks.taskbarSeconds,
   'vis-classic-alttab': visualTweaks.classicAltTab,
   'vis-no-shake': visualTweaks.noWindowShake,
+  'vis-no-shadows': visualTweaks.noShadows,
+  'vis-no-drag-full': visualTweaks.noDragFull,
+  'vis-fx-custom-min': visualTweaks.fxCustomMin,
   // — Power (core/power.js) —
   'power-ultimate': powerTweaks.unlockUltimatePerformance,
   'power-balanced': powerTweaks.setBalancedPlan,
@@ -211,6 +214,7 @@ const TWEAK_REGISTRY = {
   'power-lid-nothing': powerTweaks.lidCloseNothing,
   'power-sleep-never': powerTweaks.sleepNever,
   'power-no-auto-hibernate': powerTweaks.noAutoHibernate,
+  'power-active-cooling': powerTweaks.activeCooling,
   // — System boot & behavior + NTFS (core/system.js) —
   'sys-verbose-boot': systemTweaks.verboseBoot,
   'sys-bsod-details': systemTweaks.bsodDetails,
@@ -454,6 +458,7 @@ const FREE_TWEAKS = new Set([
   'sys-verbose-boot', 'sys-bsod-details', 'sys-fast-shutdown', 'sys-storage-sense',
   'vis-classic-clock', 'vis-no-taskbar-search', 'vis-taskbar-seconds',
   'vis-classic-alttab', 'vis-no-shake',
+  'vis-no-shadows', 'vis-no-drag-full', 'vis-fx-custom-min',
 ]);
 
 /* Device Manager latency disables (Pro). id comes from a fixed allow-list in
@@ -488,6 +493,7 @@ const TIER_PRICES = [0, 5, 15, 30];
 const BASE_TWEAKS = new Set([
   'power-ultimate', 'power-balanced', 'power-no-usb-suspend', 'power-no-disk-sleep',
   'power-lid-nothing', 'power-sleep-never', 'power-no-auto-hibernate',
+  'power-active-cooling',
   'vis-no-peek', 'vis-no-anim', 'vis-no-blur', 'vis-transparency-off', 'vis-no-toggle-keys',
   'adv-no-delivery-opt', 'adv-no-bg-apps', 'adv-no-activity', 'adv-no-clipboard-hist',
   'adv-no-xbox-bar', 'debloat-visual-fx', 'debloat-disk-cleanup',
@@ -557,6 +563,13 @@ ipcMain.handle('tweak:revert', async (_e, { id }) => {
 function presetTier(p) {
   return Math.max(0, ...p.ids.map((tid) => tierOf(tid)));
 }
+/* One-way progress pings for the loading overlay (renderer subscribes via
+ * preset.onProgress). Fire-and-forget: a dead window must never break tweaks. */
+function sendProgress(msg) {
+  try {
+    if (win && !win.isDestroyed()) win.webContents.send('preset:progress', msg);
+  } catch { /* overlay is cosmetic; the tweak result is what matters */ }
+}
 /* Built-ins PLUS validated customs from <userData>/custom-presets.json.
  * Customs with unknown ids (typos, removed tweaks) are dropped here so one
  * bad private entry can never break the built-in list. */
@@ -585,20 +598,34 @@ ipcMain.handle('preset:apply', async (_e, { id }) => {
   }
   try {
     await backup.ensureRestorePoint(`TidalTweaks preset ${p.id}`);
+    sendProgress({ preset: p.id, phase: 'restore', index: 0, total: p.ids.length });
     const reverts = [];
     const lines = [];
     let done = 0;
+    let step = 0;
     for (const tid of p.ids) {
+      step++;
       const fn = TWEAK_REGISTRY[tid];
-      if (typeof fn !== 'function') { lines.push(`✗ ${tid}: unknown tweak`); continue; }
+      if (typeof fn !== 'function') {
+        lines.push(`✗ ${tid}: unknown tweak`);
+        sendProgress({ preset: p.id, phase: 'step', index: step, total: p.ids.length, id: tid, ok: false });
+        continue;
+      }
       try {
         const r = await fn();
         if (r && r.ok) {
           done++;
           if (r.revert) (Array.isArray(r.revert) ? reverts.push(...r.revert) : reverts.push(r.revert));
           lines.push(`✓ ${tid}`);
-        } else lines.push(`✗ ${tid}: ${(r && r.message) || 'failed'}`);
-      } catch (err) { lines.push(`✗ ${tid}: ${String((err && err.message) || err)}`); }
+          sendProgress({ preset: p.id, phase: 'step', index: step, total: p.ids.length, id: tid, ok: true });
+        } else {
+          lines.push(`✗ ${tid}: ${(r && r.message) || 'failed'}`);
+          sendProgress({ preset: p.id, phase: 'step', index: step, total: p.ids.length, id: tid, ok: false, message: (r && r.message) || 'failed' });
+        }
+      } catch (err) {
+        lines.push(`✗ ${tid}: ${String((err && err.message) || err)}`);
+        sendProgress({ preset: p.id, phase: 'step', index: step, total: p.ids.length, id: tid, ok: false });
+      }
     }
     // Free presets contain only free tweaks, so no gate check per item needed;
     // a Pro preset already passed the gate above.
@@ -643,8 +670,42 @@ ipcMain.handle('game:gpu-pref', async () => {
 });
 
 /* ==========================================================================
- * Safety: restore points + undo (Restore tab, available to everyone)
+ * Factory reset — remove ALL tweaks and start from scratch. Replays the
+ * entire undo log (newest first), then parks the power plan on Balanced.
+ * Honest accounting included: entries with no revert data (AppX removals,
+ * Edge/OneDrive uninstalls, one-shot repairs) CANNOT come back by themselves
+ * and are reported by id so the user knows exactly what needs manual action
+ * (Microsoft Store reinstall, etc.). The System Restore safety net still
+ * applies for anything the log can't express.
  * ========================================================================== */
+function revertEntryIsManual(entry) {
+  const revs = Array.isArray(entry.revert) ? entry.revert : [entry.revert];
+  return !revs.length || revs.every((r) => !r || r.kind === 'none');
+}
+ipcMain.handle('restore:factory-reset', async () => {
+  try {
+    const hist = backup.history();
+    const entries = (hist && hist.history) || [];
+    if (!entries.length) return { ok: false, message: 'Nothing to reset — no tweaks on record.' };
+    // Snapshot the manual-action list BEFORE revertAll wipes the log.
+    const manual = entries.filter(revertEntryIsManual).map((e) => e.id);
+    const r = await backup.revertAll();
+    let powerMsg = '';
+    try {
+      const pr = await powerTweaks.setBalancedPlan();
+      powerMsg = pr && pr.ok ? ' Power plan parked on Balanced.' : '';
+    } catch { /* power reset is best-effort on top of a completed revert */ }
+    const lines = [`${r.message || 'Revert complete.'}${powerMsg}`];
+    if (manual.length) {
+      lines.push(`NOT auto-reverted (${manual.length}) — needs manual action: ${manual.join(', ')}. AppX removals come back via the Microsoft Store; uninstalled programs need reinstalling.`);
+    } else {
+      lines.push('Everything on record was reverted automatically.');
+    }
+    return { ok: true, message: lines[0], details: lines, manual };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
 ipcMain.handle('restore:create', (_e, { label } = {}) => backup.createRestorePoint(label));
 ipcMain.handle('restore:undo-last', () => backup.undoLast());
 ipcMain.handle('restore:revert-all', () => backup.revertAll());
@@ -701,7 +762,7 @@ ipcMain.handle('license:set-lite', (_e, { value } = {}) => {
 
 /* Appearance settings (Settings → Appearance). Device-level like liteMode —
  * themes are a display preference, not per-account data. */
-const THEMES = ['tsunami', 'abyss', 'royal', 'emerald', 'crimson', 'sunset', 'arctic', 'mono'];
+const THEMES = ['tsunami', 'abyss', 'royal', 'emerald', 'crimson', 'sunset', 'arctic', 'mono', 'inferno', 'candy', 'toxic'];
 const ACCENTS = ['blue', 'gold', 'violet', 'mint', 'rose', 'cyan', 'orange', 'silver'];
 ipcMain.handle('settings:get', () => ({
   ok: true,

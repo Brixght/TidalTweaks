@@ -34,20 +34,27 @@
       okText: 'Harden all',
     });
     if (!ok) return;
+    // Same loading screen as presets, driven manually (these are direct
+    // tweak calls, not a preset:apply run, so there are no main events).
+    TT.progress.show(`Privacy hardening (${mine.length} tweaks)`, mine.length, 'privacy-harden');
     let done = 0;
+    let step = 0;
     for (const id of mine) {
+      step++;
+      const meta = (TT.TWEAKS || {})[id] || {};
       try {
         const r = await TT.api.tweak.apply(id);
         if (r && r.ok) {
           done++;
           const card = document.querySelector(`[data-tweak="${id}"]`);
           if (card) card.classList.add('applied');
-        } else TT.toast(`${id}: ${(r && r.message) || 'failed'}`, 'error');
-      } catch (e) { TT.toast(`${id}: ${String(e)}`, 'error'); }
+          TT.progress.step(step, mine.length, meta.t || id, true);
+        } else TT.progress.step(step, mine.length, `${meta.t || id} — ${(r && r.message) || 'failed'}`, false);
+      } catch (e) { TT.progress.step(step, mine.length, `${meta.t || id} — ${String(e)}`, false); }
     }
-    TT.toast(`Privacy hardening: ${done}/${mine.length} applied.` +
+    TT.progress.done(`Privacy hardening: ${done}/${mine.length} applied.` +
       (skipped.length ? ` (${skipped.length} Extreme skipped.)` : ''),
-      done === mine.length ? 'success' : '', 5000);
+      done === mine.length);
     if (TT.refreshRestore) TT.refreshRestore();
   };
 })();

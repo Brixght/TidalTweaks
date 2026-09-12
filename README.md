@@ -12,7 +12,6 @@ Go to [**Releases**](../../releases) and grab `TidalTweaks Setup X.Y.Z.exe`. No 
 > Windows SmartScreen will warn about an unknown publisher (no paid code-signing cert yet) → **More info → Run anyway**.
 
 ## 🛡 Antivirus notice (please read — it's a false positive)
-
 **Yes, Windows Defender or VirusTotal may flag this app. No, it's not a virus.** I'm one person trying to help people speed up their PCs — there is nothing malicious in here, and you don't have to take my word for it:
 
 - **The entire source code is right here on GitHub.** Every PowerShell command, every registry value — read it all before you run anything.
@@ -21,6 +20,8 @@ Go to [**Releases**](../../releases) and grab `TidalTweaks Setup X.Y.Z.exe`. No 
 - **What to do:** on SmartScreen click *More info → Run anyway*. If Defender quarantines it, restore it and add an exclusion — then compare what it does against the source here.
 
 If anything ever behaves unexpectedly, open an Issue and I'll answer it publicly.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## ✨ Features
 

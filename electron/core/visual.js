@@ -175,6 +175,39 @@ const noWindowShake = () => wrap(async () => {
   return r.ok ? { ok: true, message: 'Aero Shake disabled.', revert: r.revert } : r;
 });
 
+/* Icon-label + taskbar shadows off: one less compositing pass per frame. */
+const noShadows = () => wrap(async () => {
+  const a = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'ListviewShadow', 0);
+  const b = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'TaskbarAnimations', 0);
+  if (!a.ok || !b.ok) return { ok: false, message: a.message || b.message };
+  return { ok: true, message: 'Icon and taskbar shadows off.', revert: [a.revert, b.revert] };
+});
+
+/* Don't show window contents while dragging: moving windows gets cheaper. */
+const noDragFull = () => wrap(async () => {
+  const r = await regSetString('HKCU', 'Control Panel\\Desktop', 'DragFullWindows', '0');
+  return r.ok ? { ok: true, message: 'Drag shows outlines only.', revert: r.revert } : r;
+});
+
+/* Minimal FX bundle: kills combobox/listbox/selection/tooltip/cursor-shadow
+ * animations in one shot (the "custom → uncheck everything" recipe). */
+const fxCustomMin = () => wrap(async () => {
+  const pairs = [
+    ['ComboBoxAnimation', '0'], ['ListBoxSmoothScrolling', '0'],
+    ['SelectionFade', '0'], ['TooltipAnimation', '0'],
+  ];
+  const reverts = [];
+  for (const [name, val] of pairs) {
+    const r = await regSetString('HKCU', 'Control Panel\\Desktop', name, val);
+    if (!r.ok) return { ok: false, message: `${name}: ${r.message}` };
+    reverts.push(r.revert);
+  }
+  const c = await regSetDword('HKCU', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'CursorShadow', 0);
+  if (!c.ok) return { ok: false, message: c.message };
+  reverts.push(c.revert);
+  return { ok: true, message: 'Micro-animations bundle off (5 spots).', revert: reverts };
+});
+
 module.exports = {
   setMenuDelay0, disableAeroPeek, disableWindowAnimations, disableBlur,
   setTransparencyOff, setTransparencyOn, showFileExtensions,
@@ -182,4 +215,5 @@ module.exports = {
   classicContextMenu, enableEndTask, hideTaskView, hideChatIcon, numlockOnBoot,
   noNetworkThumbs, thisPCDefault, noLockScreen, noLogonBlur, taskbarLeft,
   classicClock, hideTaskbarSearch, taskbarSeconds, classicAltTab, noWindowShake,
+  noShadows, noDragFull, fxCustomMin,
 };

@@ -355,9 +355,10 @@
       <div class="page-head"><h1>Safety &amp; Restore</h1><p>Restore points and undo — available to everyone</p></div>
       <div class="glass card">
         <div class="row">
-          <button class="btn primary" id="restore-create">🛡&nbsp; Create restore point</button>
-          <button class="btn secondary" id="restore-undo">↩&nbsp; Undo last tweak</button>
-          <button class="btn danger" id="restore-all">⟲&nbsp; Revert all changes</button>
+        <button class="btn primary" id="restore-create">🛡&nbsp; Create restore point</button>
+        <button class="btn secondary" id="restore-undo">↩&nbsp; Undo last tweak</button>
+        <button class="btn secondary" id="restore-all">⟲&nbsp; Revert all changes</button>
+        <button class="btn danger" id="restore-factory" title="Remove every tweak on record and park the power plan on Balanced">🧨&nbsp; Factory reset tweaks</button>
         </div>
         <p class="dim" id="restore-status"></p>
       </div>
@@ -396,6 +397,9 @@
             <option value="sunset">Sunset (orange)</option>
             <option value="arctic">Arctic (light)</option>
             <option value="mono">Mono (grayscale)</option>
+            <option value="inferno">Inferno (ember gradient)</option>
+            <option value="candy">Candy (pink gradient)</option>
+            <option value="toxic">Toxic (acid gradient)</option>
           </select>
           <label class="dim" for="accent-select">Accent</label>
           <select id="accent-select" class="input">
@@ -453,7 +457,7 @@
         <button class="btn danger" id="settings-revert-all">⟲&nbsp; Revert all changes</button>
       </div>
       <div class="glass card"><h3>About</h3>
-        <p class="dim">TidalTweaks v2.3 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
+        <p class="dim">TidalTweaks v2.4 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
         <p class="dim">Antivirus flags? False positive — this app edits the registry and runs PowerShell like every optimizer does, so heuristics complain. Full source is on GitHub; read every line.</p>
       </div>
     </section>
@@ -473,6 +477,24 @@
     <div class="row end">
       <button class="btn secondary" id="modal-cancel">Cancel</button>
       <button class="btn primary" id="modal-ok">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Progress overlay: the loading screen for long applies (presets,
+     harden-all, factory reset). Steps stream in live; nothing here is
+     clickable mid-run on purpose — killing a half-applied stack would leave
+     a mess the undo log can't fully describe. The restore point + full undo
+     entry land when the run finishes. -->
+<div id="progress-root" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal glass progress-modal" role="dialog" aria-modal="true" aria-live="polite">
+    <h3 id="progress-title">Working…</h3>
+    <p id="progress-sub" class="dim"></p>
+    <div class="progress"><div class="fill" id="progress-fill"></div></div>
+    <div id="progress-log" class="progress-log"></div>
+    <div class="row end">
+      <button class="btn primary" id="progress-close" hidden>Done</button>
     </div>
   </div>
 </div>

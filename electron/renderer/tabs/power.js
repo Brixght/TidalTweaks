@@ -9,6 +9,7 @@
     'power-lid-nothing',
     'power-sleep-never',
     'power-no-auto-hibernate',
+    'power-active-cooling',
     'power-no-usb-suspend',
     'power-no-disk-sleep',
     'power-cpu-min-100',

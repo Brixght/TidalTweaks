@@ -51,6 +51,32 @@
     TT.toast((r && r.message) || '', r && r.ok ? 'success' : 'error', 5000);
     history();
   };
+  // Factory reset: same undo log, taken to zero — plus the power plan parked
+  // on Balanced and an honest list of what needs manual action (removed apps
+  // can't reinstall themselves). Runs under the loading screen.
+  const factoryBtn = $('restore-factory');
+  if (factoryBtn) factoryBtn.onclick = async () => {
+    const ok = await TT.confirm({
+      title: 'Factory reset all tweaks?',
+      body: 'This removes EVERY tweak on record and parks the power plan on Balanced — back to stock.\n\nAnything already listed as manual-action (removed apps, uninstalled programs) will still need YOU: Microsoft Store reinstalls, etc.\nSystem Restore points are untouched.',
+      okText: 'Reset everything',
+    });
+    if (!ok) return;
+    TT.progress.show('Factory reset — removing all tweaks', 0, 'factory-reset');
+    const r = await TT.api.restore.factoryReset().catch((e) => ({ ok: false, message: String(e) }));
+    if (r && r.details && Array.isArray(r.details)) {
+      // Surface the per-line report (including the manual-action list).
+      const log = document.getElementById('progress-log');
+      r.details.forEach((line) => {
+        const div = document.createElement('div');
+        div.className = 'plog-row' + (/NOT auto-reverted/.test(line) ? ' bad' : ' ok');
+        div.textContent = line;
+        if (log) { log.appendChild(div); log.scrollTop = log.scrollHeight; }
+      });
+    }
+    TT.progress.done((r && r.message) || 'Factory reset failed.', !!(r && r.ok));
+    history();
+  };
 
   // LAZY: history file read waits for first show (cheap anyway, but free).
   let loaded = false;

@@ -23,6 +23,7 @@
     'vis-hidden-files', 'vis-transparency-on', 'vis-classic-context',
     'vis-end-task', 'vis-no-taskview', 'vis-no-chat', 'vis-numlock',
     'vis-no-thumbs-network', 'vis-this-pc', 'vis-no-login-blur', 'vis-taskbar-left',
+    'vis-no-shadows', 'vis-no-drag-full', 'vis-fx-custom-min',
   ]);
   TT.renderTweaks(q('visual'), [
     'vis-no-peek', 'vis-no-anim', 'vis-no-blur', 'vis-transparency-off',

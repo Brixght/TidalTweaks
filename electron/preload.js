@@ -70,6 +70,13 @@ contextBridge.exposeInMainWorld('api', {
   preset: {
     list: () => ipcRenderer.invoke('preset:list'),
     apply: (id) => ipcRenderer.invoke('preset:apply', { id }),
+    // Live step events {preset, phase, index, total, id, ok, message}.
+    // Returns an unsubscribe function — callers must clean up.
+    onProgress: (cb) => {
+      const listener = (_e, msg) => cb(msg);
+      ipcRenderer.on('preset:progress', listener);
+      return () => ipcRenderer.removeListener('preset:progress', listener);
+    },
   },
 
   // — Saved-games priority boost (Free) —
@@ -83,6 +90,7 @@ contextBridge.exposeInMainWorld('api', {
     create: (label) => ipcRenderer.invoke('restore:create', { label }),
     undoLast: () => ipcRenderer.invoke('restore:undo-last'),
     revertAll: () => ipcRenderer.invoke('restore:revert-all'),
+    factoryReset: () => ipcRenderer.invoke('restore:factory-reset'),
     history: () => ipcRenderer.invoke('restore:history'),
   },
 

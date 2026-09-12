@@ -148,9 +148,21 @@ async function noAutoHibernate() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Active cooling policy (AC): fans ramp BEFORE clocks drop. Laptops that
+ * "mysteriously" lose fps after 10 minutes are usually heat-throttling on a
+ * passive policy — this flips the order. Louder, faster, longer. */
+async function activeCooling() {
+  try {
+    const r = await powerSet('54533251-82be-4824-96c1-47b60b740d00', '94d3a615-a899-4ac5-ae2b-e4d8f634367f', 1);
+    return r.ok
+      ? { ok: true, message: 'Cooling policy → Active (fans first).', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   unlockUltimatePerformance, setHighPerformance, setBalancedPlan,
   disableUSBSelectiveSuspend, disableDiskSleep,
   setMinProcessorState100, disablePcieLinkState, disableModernStandby,
-  lidCloseNothing, sleepNever, noAutoHibernate,
+  lidCloseNothing, sleepNever, noAutoHibernate, activeCooling,
 };

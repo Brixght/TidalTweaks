@@ -172,7 +172,7 @@
   }
   // Each theme ships a native accent; picking a theme re-pairs it, picking
   // an accent keeps your explicit choice.
-  const NATIVE_ACCENT = { tsunami: 'blue', abyss: 'blue', royal: 'violet', emerald: 'mint', crimson: 'rose', sunset: 'orange', arctic: 'blue', mono: 'silver' };
+  const NATIVE_ACCENT = { tsunami: 'blue', abyss: 'blue', royal: 'violet', emerald: 'mint', crimson: 'rose', sunset: 'orange', arctic: 'blue', mono: 'silver', inferno: 'orange', candy: 'rose', toxic: 'mint' };
   async function pushAppearance(fromTheme) {
     const theme = themeSel.value;
     const accent = fromTheme ? (NATIVE_ACCENT[theme] || 'blue') : accentSel.value;

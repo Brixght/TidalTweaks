@@ -87,14 +87,12 @@
       okText: `Apply ${p.ids.length} tweaks`,
     });
     if (!ok) return;
+    // Loading screen: title + live step log streamed from the main process.
+    // Steps appear as they land; the summary below is authoritative.
+    TT.progress.show(`${p.title} (${p.ids.length} tweaks)`, p.ids.length, p.id);
     const res = await TT.api.preset.apply(p.id).catch((e) => ({ ok: false, message: String(e) }));
-    if (res && res.ok) {
-      TT.toast(res.message, 'success', 5000);
-      TT.confetti();
-    } else {
-      TT.toast((res && res.message) || 'Preset failed.', 'error', 6000);
-      if (res && res.details) console.info('[preset]', p.id, res.details);
-    }
+    TT.progress.done((res && res.message) || 'Preset failed.', !!(res && res.ok));
+    if (res && res.ok) TT.confetti();
     if (TT.refreshRestore) TT.refreshRestore();
     load(); // re-seat Pro/FREE states (a preset can't activate, but cheap)
   }
