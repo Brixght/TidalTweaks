@@ -46,8 +46,10 @@
       const osv = p.os || 'both';
       sub.textContent = `🖥 ${osv === 'both' ? 'Windows 10 · 11' : (osv === 'win11' ? 'Windows 11' : 'Windows 10')}` +
         ((p.games && p.games.length) ? ` · 🎮 saves: ${p.games.join(', ')}` : '');
-      // Transparent contents: every included tweak by name.
+      // Transparent contents in a SCROLLABLE box: a 61-tweak stack must never
+      // push its own Apply button off the card (same for the confirm modal).
       const ul = document.createElement('div');
+      ul.className = 'preset-includes';
       ul.style.margin = '10px 0';
       (p.ids || []).forEach((tid) => {
         const meta = (TT.TWEAKS || {})[tid];

@@ -4,6 +4,15 @@ All notable changes, newest first. Version numbers match GitHub Releases
 (`TidalTweaks Setup X.Y.Z.exe`). Same-day releases happen when a fix can't
 wait — a higher number is always the one to download.
 
+## v2.4.1
+
+- **Scrollable preset + modal lists**: 60-tweak stacks no longer push their
+  own Apply button off-screen.
+- **Preset effectiveness pass**: every preset audited — no dead ids, no
+  duplicates, no self-cancelling pairs, correct tiers.
+- **Tips & Tricks tab**: what tweaks can't fix — RAM/SSD/XMP, Fortnite
+  settings, thermals, lag-vs-stutter diagnosis, match-day hygiene.
+
 ## v2.4.0
 
 - **Preset loading screen**: long applies now narrate themselves — live

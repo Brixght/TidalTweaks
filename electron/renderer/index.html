@@ -134,6 +134,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19a2 2 0 012-2h13"/></svg>
         <span>Library</span>
       </button>
+      <button class="nav-item" data-tab="tips">
+        <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0012 3z"/></svg>
+        <span>Tips</span>
+      </button>
       <div class="nav-sep"><span>PRO</span></div>
       <button class="nav-item" data-tab="gaming" data-pro="1">
         <svg viewBox="0 0 24 24"><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01M17.3 5H6.7a4 4 0 00-3.9 3.1L1.5 13a3 3 0 005.2 2.9L9 13h6l2.3 2.9a3 3 0 005.2-2.9l-1.3-4.9A4 4 0 0017.3 5z"/></svg>
@@ -288,6 +292,42 @@
           </select>
         </div>
         <div id="library-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-tips">
+      <div class="page-head"><h1>Tips &amp; Tricks 💡</h1><p>What tweaks can't do — biggest wins first, zero downloads</p></div>
+      <div class="glass card">
+        <h3>🥇 RAM: 8GB → 16GB is the #1 upgrade</h3>
+        <p class="dim">No registry tweak creates memory. If your RAM sits above 85% while gaming, Windows pages to disk and you get exactly the late-game stutter tweaks can't fix. A matching 8GB stick is the cheapest fps-per-dollar on earth. Check your usage live on the Dashboard.</p>
+      </div>
+      <div class="glass card">
+        <h3>🥈 SSD + free space</h3>
+        <p class="dim">Windows AND your games belong on an SSD — a hard drive stutters no matter the tweaks. Keep 15–20% of the drive free; a nearly-full SSD slows down measurably. Storage Sense (Tweaks tab, free) automates the cleanup.</p>
+      </div>
+      <div class="glass card">
+        <h3>🥉 BIOS freebies: XMP/EXPO + Resizable BAR</h3>
+        <p class="dim">If your RAM runs at JEDEC speed instead of its rated XMP/EXPO profile, you're leaving up to 10–15% on the table — more than every registry tweak combined. Enable it in BIOS (usually one click), plus Resizable BAR if your GPU supports it. No software can do this for you.</p>
+      </div>
+      <div class="glass card">
+        <h3>🎮 Fortnite-specific</h3>
+        <p class="dim">Rendering Mode → <b>Performance</b> (not DX11/DX12) on weak GPUs · 3D Resolution slider to minimum, then raise until fps dips · cap framerate at your refresh rate (uncapped = heat = throttle = stutter) · Textures/Meshes Low · turn off Replays · NVIDIA Reflex Low+Boost if offered. Your Low-End preset saves the matching exes — use Gaming → Boost while playing.</p>
+      </div>
+      <div class="glass card">
+        <h3>🌡 Thermals are fps</h3>
+        <p class="dim">Laptops lose 20–30% clocks when hot. Play plugged in, elevate the back for airflow, clean the fans yearly, and use the Active Cooling tweak (Power tab). If fps is great for 10 minutes then falls off a cliff, that's heat — not settings.</p>
+      </div>
+      <div class="glass card">
+        <h3>🌐 Lag vs stutter: know which you have</h3>
+        <p class="dim">Rubber-banding/teleporting = <b>network</b> (use ethernet, close cloud backups, try the Network tab). Hitching/freezing with fine ping = <b>your PC</b> (RAM, thermals, disk). Fixing the wrong one wastes hours — diagnose first with the ping graph.</p>
+      </div>
+      <div class="glass card">
+        <h3>🧹 Match-day hygiene</h3>
+        <p class="dim">Before ranked: reboot (clears standby memory), pause OneDrive/Steam downloads, close Chrome (it eats RAM for breakfast), set Discord to Push-to-Talk. Five minutes, free fps.</p>
+      </div>
+      <div class="glass card">
+        <h3>🚫 What NOT to do</h3>
+        <p class="dim">Never disable Defender/antivirus for fps. Never run registry packs from random videos without backups (ours backs everything up — theirs don't). Never disable the pagefile on 8GB RAM. Never pay for "game booster" software — that's usually the malware.</p>
       </div>
     </section>
 
@@ -457,7 +497,7 @@
         <button class="btn danger" id="settings-revert-all">⟲&nbsp; Revert all changes</button>
       </div>
       <div class="glass card"><h3>About</h3>
-        <p class="dim">TidalTweaks v2.4 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
+        <p class="dim">TidalTweaks v2.4.1 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
         <p class="dim">Antivirus flags? False positive — this app edits the registry and runs PowerShell like every optimizer does, so heuristics complain. Full source is on GitHub; read every line.</p>
       </div>
     </section>

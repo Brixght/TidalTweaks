@@ -371,6 +371,18 @@ body.is-pro .nav-item .crown { filter: none; opacity: 1; }
 .plog-row.ok { color: var(--success); }
 .plog-row.bad { color: var(--error); }
 
+/* Scrollable preset contents: 60-tweak stacks must not push the Apply
+ * button off-screen (or bloat the confirm modal past the window). */
+.preset-includes {
+  max-height: 190px; overflow-y: auto;
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid var(--border-dim); border-radius: 10px;
+  padding: 6px 12px; margin: 10px 0;
+}
+#modal-body {
+  max-height: 38vh; overflow-y: auto; padding-right: 6px;
+}
+
 /* ============================ Toasts (bottom-right) ====================== */
 #toast-root { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
 .toast {

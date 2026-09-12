@@ -539,7 +539,7 @@
   }
 
   /* ------------------------------ router --------------------------------- */
-  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'gaming',
+  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'tips', 'gaming',
     'registry', 'debloat', 'privacy', 'power', 'restore', 'settings', 'owner'];
   let current = 'dashboard';
 
