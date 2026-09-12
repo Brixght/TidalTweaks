@@ -28,6 +28,14 @@
       const pt = p.tier || 0;
       tag.className = pt === 0 ? 'free-tag' : (pt === 1 ? 'tier-tag tier-base' : (pt === 3 ? 'tier-tag tier-extreme' : 'pro-tag'));
       tag.textContent = (TT.TIER_NAMES[pt] || 'FREE').toUpperCase();
+      if (p.custom) {
+        // Local-only stack (custom-presets.json): never shipped, never synced.
+        const mine = document.createElement('span');
+        mine.className = 'os-tag';
+        mine.textContent = 'CUSTOM · THIS PC ONLY';
+        mine.style.marginLeft = '8px';
+        h.append(mine, ' ');
+      }
       h.appendChild(tag);
       const desc = document.createElement('p');
       desc.className = 'dim';

@@ -88,6 +88,16 @@ electron/
   scripts/           # afterPack (icon stamp for the installer)
 ```
 
+## 🧩 Custom presets (local-only, never synced)
+
+Power users can add private stacks in `<userData>/custom-presets.json`
+(next to `users.json` in Electron's app-data folder) — same shape as built-ins
+(`id`, `title`, `desc`, `warn`, `os`, `ids[]`, `games[]`). They merge into the
+Presets tab with a CUSTOM badge, get one restore point + one undo like everything
+else, and are tiered by their contents. Malformed entries are skipped silently,
+so a typo can never break the built-in list. This file is yours alone: it is
+not in git, not in the installer, not synced anywhere.
+
 ## ⚠️ Disclaimer
 
 Tweaks modify Windows. TidalTweaks creates restore points and backups automatically, but you apply tweaks at your own risk — read each confirmation dialog (especially HPET, Secure Boot, and boot-config tweaks) before applying.

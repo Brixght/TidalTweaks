@@ -557,12 +557,27 @@ ipcMain.handle('tweak:revert', async (_e, { id }) => {
 function presetTier(p) {
   return Math.max(0, ...p.ids.map((tid) => tierOf(tid)));
 }
+/* Built-ins PLUS validated customs from <userData>/custom-presets.json.
+ * Customs with unknown ids (typos, removed tweaks) are dropped here so one
+ * bad private entry can never break the built-in list. */
+function allPresets() {
+  const builtins = presets.list();
+  let customs = [];
+  try {
+    customs = presets
+      .listCustom(app.getPath('userData'))
+      .filter((p) => p.ids.every((tid) => typeof TWEAK_REGISTRY[tid] === 'function'));
+  } catch {
+    customs = [];
+  }
+  return [...builtins, ...customs];
+}
 ipcMain.handle('preset:list', () => ({
   ok: true,
-  presets: presets.list().map((p) => ({ ...p, tier: presetTier(p), tierName: TIER_NAMES[presetTier(p)] })),
+  presets: allPresets().map((p) => ({ ...p, tier: presetTier(p), tierName: TIER_NAMES[presetTier(p)] })),
 }));
 ipcMain.handle('preset:apply', async (_e, { id }) => {
-  const p = presets.get(String(id || ''));
+  const p = allPresets().find((x) => x.id === String(id || ''));
   if (!p) return { ok: false, message: 'Unknown preset.' };
   const need = presetTier(p);
   if (accountTier() < need) {

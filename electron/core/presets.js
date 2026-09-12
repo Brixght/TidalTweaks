@@ -5,7 +5,15 @@
  * A preset is { id, title, desc, pro, warn, ids[] }. The runner in main.js
  * creates ONE restore point for the whole stack and logs ONE undo entry, so
  * "Undo last tweak" rolls back the entire preset in one go.
+ *
+ * CUSTOM PRESETS (local-only, never in git): <userData>/custom-presets.json
+ * holds an ARRAY of the same shape. main.js merges them into preset:list, so
+ * private stacks (like a machine-specific LowEnd pack) live ONLY on that PC.
+ * Shape is validated strictly; entries referencing unknown tweak ids are
+ * skipped silently (a typo must never break the built-in list).
  * ========================================================================== */
+const fs = require('node:fs');
+const path = require('node:path');
 
 const PRESETS = [
   {
@@ -135,4 +143,30 @@ function get(id) {
   return PRESETS.find((p) => p.id === id) || null;
 }
 
-module.exports = { list, get };
+/* Read custom presets from a userData dir. Returns shape-validated entries
+ * (unknown tweak ids are filtered by the CALLER against TWEAK_REGISTRY —
+ * this module must stay UI/registry-agnostic). Never throws. */
+function listCustom(userDataDir) {
+  try {
+    const raw = fs.readFileSync(path.join(String(userDataDir || ''), 'custom-presets.json'), 'utf8');
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((p) => p && typeof p === 'object')
+      .map((p) => ({
+        id: String(p.id || '').trim(),
+        title: String(p.title || '').trim().slice(0, 80),
+        desc: String(p.desc || '').trim().slice(0, 500),
+        warn: String(p.warn || '').trim().slice(0, 800),
+        os: p.os === 'win11' || p.os === 'win10' ? p.os : 'both',
+        ids: Array.isArray(p.ids) ? p.ids.map((x) => String(x)) : [],
+        games: Array.isArray(p.games) ? p.games.map((x) => String(x)).slice(0, 20) : [],
+        custom: true,
+      }))
+      .filter((p) => p.id && p.title && p.ids.length > 0);
+  } catch {
+    return []; // missing/corrupt file = no customs, built-ins unaffected
+  }
+}
+
+module.exports = { list, get, listCustom };
