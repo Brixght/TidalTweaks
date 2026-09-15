@@ -540,7 +540,7 @@
 
   /* ------------------------------ router --------------------------------- */
   const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'tips', 'gaming',
-    'registry', 'debloat', 'privacy', 'power', 'restore', 'settings', 'owner'];
+    'registry', 'debloat', 'privacy', 'power', 'crosshair', 'restore', 'settings', 'owner'];
   let current = 'dashboard';
 
   function switchTab(id) {

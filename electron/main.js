@@ -18,7 +18,7 @@
  * the app makes ZERO license network calls (see license:validate).
  * ========================================================================== */
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen, globalShortcut } = require('electron');
 const path = require('node:path');
 const os = require('node:os');
 const Store = require('electron-store');
@@ -35,6 +35,9 @@ const store = new Store({
     liteMode: 'auto', // 'auto' | 'on' | 'off' — see resolveLite()
     theme: 'tsunami',  // tsunami | abyss | royal | emerald (Settings → Appearance)
     accent: 'blue',    // blue | gold | violet | mint | rose
+    // Crosshair overlay: last used design (see core/crosshair.js) + Pro saves.
+    crosshair: null,
+    crosshairSaved: [],
   },
 });
 
@@ -76,6 +79,7 @@ const startup = require('./core/startup');
 const ram = require('./core/ram');
 const systemTweaks = require('./core/system'); // boot behavior + NTFS (sys-*, disk-*)
 const presets = require('./core/presets'); // one-click stacks (see core/presets.js)
+const crosshair = require('./core/crosshair'); // transparent overlay (see core/crosshair.js)
 
 /* Every tweak id the UI can invoke, mapped to its core module + the backup
  * label used for undo. Registration is centralised here so the renderer only
@@ -306,12 +310,31 @@ function createWindow() {
       win.reload();
     }
   });
+
+  // Closing the main shell quits the app AND the crosshair overlay (the
+  // overlay alone must never keep the process alive headless).
+  win.on('closed', () => {
+    win = null;
+    try { crosshair.destroy(); } catch { /* ignore */ }
+    if (process.platform !== 'darwin') app.quit();
+  });
 }
 
 app.whenReady().then(() => {
   createWindow();
+  // Crosshair overlay: separate transparent always-on-top window (see core/).
+  try {
+    crosshair.init({ BrowserWindow, screen, store, getMainWindow: () => win });
+    crosshair.ensureWindow();
+  } catch (e) { console.error('crosshair init failed:', String((e && e.message) || e)); }
+  // Global hotkey: snap the crosshair back to the primary-screen center.
+  try {
+    globalShortcut.register(crosshair.RESET_HOTKEY, () => {
+      try { crosshair.resetToCenter(); } catch (e) { /* ignore */ }
+    });
+  } catch (e) { console.error('hotkey register failed:', String((e && e.message) || e)); }
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (!win || win.isDestroyed()) createWindow();
   });
 });
 app.on('second-instance', () => {
@@ -326,6 +349,8 @@ app.on('window-all-closed', () => {
 // The 0.5ms timer holder (cpu-timer-res) only lives while the app runs —
 // kill strays synchronously on quit so no invisible behavior change lingers.
 app.on('before-quit', () => {
+  try { globalShortcut.unregisterAll(); } catch { /* ignore */ }
+  try { crosshair.destroy(); } catch { /* ignore */ }
   try {
     require('node:child_process').spawnSync(
       'powershell.exe',
@@ -769,6 +794,9 @@ ipcMain.handle('settings:get', () => ({
   theme: THEMES.includes(store.get('theme')) ? store.get('theme') : 'tsunami',
   accent: ACCENTS.includes(store.get('accent')) ? store.get('accent') : 'blue',
   priorityGames: Array.isArray(store.get('priorityGames')) ? store.get('priorityGames') : [],
+  // Last used crosshair design (Crosshair tab). Sanitized in core/crosshair.js.
+  crosshair: crosshair.getConfig(),
+  crosshairSaved: crosshair.getSaved(),
 }));
 ipcMain.handle('settings:set', (_e, patch = {}) => {
   if (patch.theme !== undefined) {
@@ -788,7 +816,148 @@ ipcMain.handle('settings:set', (_e, patch = {}) => {
       .slice(0, 20);
     store.set('priorityGames', clean);
   }
-  return { ok: true, theme: store.get('theme'), accent: store.get('accent'), priorityGames: store.get('priorityGames') || [] };
+  // Persisted crosshair design (Crosshair tab auto-saves on every change).
+  if (patch.crosshair !== undefined) {
+    try { crosshair.setConfig(patch.crosshair || {}); } catch { /* ignore */ }
+  }
+  return { ok: true, theme: store.get('theme'), accent: store.get('accent'), priorityGames: store.get('priorityGames') || [], crosshair: crosshair.getConfig() };
+});
+
+/* ==========================================================================
+ * Crosshair overlay — separate transparent always-on-top window.
+ * Free: single layer (classic/dot/cross), any color, on/off toggle.
+ * Pro (tier >= 2, enforced HERE): multi-layer, full shape library,
+ * size/position/opacity sliders, save-custom. The renderer only mirrors
+ * locks for UX — these checks are the real gate.
+ * ========================================================================== */
+const crosshairProRequired = () => 'Crosshair layers, shapes, sliders and saving need Pro ($15) — activate in Settings.';
+ipcMain.handle('crosshair:get', () => {
+  try {
+    crosshair.ensureWindow();
+    return { ok: true, config: crosshair.getConfig(), saved: crosshair.getSaved() };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:set', (_e, patch = {}) => {
+  try {
+    crosshair.ensureWindow();
+    const p = { ...(patch || {}) };
+    // Pro gate: free may only touch enabled/preset/color of the single layer.
+    if (accountTier() < 2) {
+      // Anything else (layers/size/opacity/position) is Pro-only.
+      const extraPro = ['size', 'thickness', 'opacity', 'x', 'y'].filter((k) => p[k] !== undefined);
+      if (extraPro.length || (p.layers !== undefined && p.preset === undefined)) {
+        return { ok: false, message: crosshairProRequired() };
+      }
+      const allowed = {};
+      if (p.enabled !== undefined) allowed.enabled = !!p.enabled;
+      // Free presets only.
+      if (p.preset !== undefined) {
+        if (!crosshair.FREE_SHAPES.includes(String(p.preset))) {
+          return { ok: false, message: 'That shape needs Pro — activate in Settings.' };
+        }
+        allowed.preset = String(p.preset);
+        // Keep the single free layer in sync.
+        const cur = crosshair.getConfig();
+        const layers = [{ ...cur.layers[0], shape: String(p.preset) }];
+        allowed.layers = layers;
+      }
+      if (p.color !== undefined) {
+        if (!/^#[0-9a-fA-F]{6}$/.test(String(p.color))) return { ok: false, message: 'Bad color.' };
+        allowed.color = String(p.color);
+      }
+      return crosshair.setConfig(allowed);
+    }
+    return crosshair.setConfig(p);
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:toggle', (_e, { enabled } = {}) => {
+  try {
+    crosshair.ensureWindow();
+    return crosshair.toggle(enabled);
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:reset', () => {
+  try {
+    crosshair.ensureWindow();
+    return crosshair.resetToCenter();
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:set-movable', (_e, { movable } = {}) => {
+  try { return crosshair.setMovable(!!movable); }
+  catch (err) { return { ok: false, message: String((err && err.message) || err) }; }
+});
+ipcMain.handle('crosshair:nudge', (_e, { dx, dy } = {}) => {
+  try {
+    // Moving the drawing is a Pro position feature — but allow it while Alt
+    // is held so the documented Alt+drag gesture never dead-ends for Free.
+    // (Precise sliders + reset button stay Pro-gated via crosshair:set.)
+    crosshair.ensureWindow();
+    return crosshair.nudge(Number(dx) || 0, Number(dy) || 0);
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:add-layer', (_e, { shape } = {}) => {
+  if (accountTier() < 2) return { ok: false, message: crosshairProRequired() };
+  try {
+    crosshair.ensureWindow();
+    const cur = crosshair.getConfig();
+    if (cur.layers.length >= crosshair.MAX_LAYERS) {
+      return { ok: false, message: `Max ${crosshair.MAX_LAYERS} layers.` };
+    }
+    const s = crosshair.ALL_SHAPES.includes(String(shape)) ? String(shape) : 'classic';
+    const layers = [...cur.layers, { ...crosshair.defaultConfig().layers[0], id: `layer-${Date.now().toString(36)}`, shape: s, size: cur.size || 22, thickness: cur.thickness || 3, opacity: cur.opacity != null ? cur.opacity : 1, x: 0, y: 0, visible: true }];
+    return crosshair.setConfig({ layers });
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:remove-layer', (_e, { id } = {}) => {
+  if (accountTier() < 2) return { ok: false, message: crosshairProRequired() };
+  try {
+    const cur = crosshair.getConfig();
+    if (cur.layers.length <= 1) return { ok: false, message: 'Keep at least one layer.' };
+    return crosshair.setConfig({ layers: cur.layers.filter((l) => l.id !== String(id)) });
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:save', (_e, { name } = {}) => {
+  if (accountTier() < 2) return { ok: false, message: crosshairProRequired() };
+  try {
+    const cfg = crosshair.getConfig();
+    const saved = crosshair.getSaved();
+    const entry = { name: String(name || `Custom ${saved.length + 1}`).slice(0, 40), at: new Date().toISOString(), config: cfg };
+    const next = [...saved, entry].slice(-20);
+    store.set('crosshairSaved', next);
+    return { ok: true, message: `Saved “${entry.name}”.`, saved: next };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('crosshair:load-saved', (_e, { index } = {}) => {
+  try {
+    const saved = crosshair.getSaved();
+    const entry = saved[Number(index)];
+    if (!entry) return { ok: false, message: 'Saved design not found.' };
+    // Loading a multi-layer/shape design is Pro; single free-layer loads free.
+    if (accountTier() < 2) {
+      const multi = (entry.config.layers || []).length > 1;
+      const proShape = (entry.config.layers || []).some((l) => !crosshair.FREE_SHAPES.includes(l.shape));
+      if (multi || proShape) return { ok: false, message: crosshairProRequired() };
+    }
+    return crosshair.setConfig({ ...entry.config, enabled: crosshair.getConfig().enabled });
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
 });
 
 /* ==========================================================================

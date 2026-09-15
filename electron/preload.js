@@ -108,6 +108,27 @@ contextBridge.exposeInMainWorld('api', {
     set: (patch) => ipcRenderer.invoke('settings:set', patch || {}),
   },
 
+  // — Crosshair overlay (separate transparent always-on-top window) —
+  //   get/set/toggle/reset go through main (Pro-gated there); onUpdate
+  //   subscribes to live pushes for the overlay + the tab preview.
+  crosshair: {
+    get: () => ipcRenderer.invoke('crosshair:get'),
+    set: (patch) => ipcRenderer.invoke('crosshair:set', patch || {}),
+    toggle: (enabled) => ipcRenderer.invoke('crosshair:toggle', { enabled }),
+    reset: () => ipcRenderer.invoke('crosshair:reset'),
+    setMovable: (movable) => ipcRenderer.invoke('crosshair:set-movable', { movable: !!movable }),
+    nudge: (dx, dy) => ipcRenderer.invoke('crosshair:nudge', { dx, dy }),
+    addLayer: (shape) => ipcRenderer.invoke('crosshair:add-layer', { shape }),
+    removeLayer: (id) => ipcRenderer.invoke('crosshair:remove-layer', { id }),
+    save: (name) => ipcRenderer.invoke('crosshair:save', { name }),
+    loadSaved: (index) => ipcRenderer.invoke('crosshair:load-saved', { index }),
+    onUpdate: (cb) => {
+      const listener = (_e, cfg) => cb(cfg);
+      ipcRenderer.on('crosshair:update', listener);
+      return () => ipcRenderer.removeListener('crosshair:update', listener);
+    },
+  },
+
   // — Accounts (device-local, see core/users.js). Passwords only travel at
   //   entry (signup/login/change); everything else passes usernames/roles. —
   auth: {

@@ -593,3 +593,152 @@ body[data-theme="arctic"] .warn-banner { color: #8a6d1c; background: rgba(232, 1
 /* Optional text field inside the confirm modal (password resets, …). */
 #modal-input { width: 100%; margin: 12px 0 4px; }
 #modal-input[hidden] { display: none; }
+
+/* ============================ Crosshair tab ==============================
+ * Glassmorphism panels (reuses .glass), smooth 200–300ms animations, purple
+ * accent (#9D7BFF) reserved for Pro crosshair features. Layout mirrors the
+ * design screenshot: banner → presets → color → saved → layers (left),
+ * preview + big toggle (right). */
+.ch-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; margin-bottom: 16px;
+  border-color: rgba(157, 123, 255, 0.28);
+  animation: pageIn 0.25s var(--ease);
+}
+.ch-banner p { flex: 1; font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+.ch-dot {
+  width: 9px; height: 9px; min-width: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.8);
+}
+.ch-layout { display: grid; grid-template-columns: 1fr 290px; gap: 16px; align-items: start; }
+.ch-main { display: flex; flex-direction: column; min-width: 0; }
+.ch-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; }
+.ch-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ch-card-head h3 { margin: 0 !important; }
+
+/* Preset tiles: mini crosshair + label. Selected gets the purple ring. */
+.ch-preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.ch-preset {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 6px 9px; border-radius: 10px; cursor: pointer;
+  background: rgba(var(--deep-rgb), 0.5);
+  border: 1px solid rgba(var(--accent-rgb), 0.14);
+  transition: all 0.2s var(--ease);
+  animation: pageIn 0.25s var(--ease);
+}
+.ch-preset:hover { border-color: rgba(var(--accent-rgb), 0.45); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.2); transform: translateY(-1px); }
+.ch-preset.selected { border-color: #9D7BFF; box-shadow: 0 0 16px rgba(157, 123, 255, 0.45); background: rgba(157, 123, 255, 0.1); }
+.ch-preset svg { width: 34px; height: 34px; }
+.ch-preset span { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.ch-preset.selected span { color: #fff; }
+.ch-preset.locked { opacity: 0.55; }
+.ch-preset.locked::after {
+  content: '👑'; position: absolute; top: 6px; right: 8px; font-size: 12px;
+  filter: drop-shadow(0 0 4px rgba(157,123,255,0.8));
+}
+.ch-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: 1px;
+  padding: 1px 7px; border-radius: 10px; vertical-align: 1px;
+}
+.ch-badge.free { color: #081733; background: linear-gradient(135deg, var(--success), #c0f5d4); }
+.ch-badge.pro { color: #fff; background: linear-gradient(135deg, #7C5CFF, #B794FF); box-shadow: 0 0 10px rgba(157,123,255,0.45); }
+
+/* Color swatches + custom picker. */
+.ch-color-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ch-swatches { display: flex; gap: 9px; flex-wrap: wrap; }
+.ch-swatch {
+  width: 34px; height: 22px; border-radius: 6px; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.2s var(--ease);
+}
+.ch-swatch:hover { transform: scale(1.1); }
+.ch-swatch.selected { border-color: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.45); transform: scale(1.08); }
+.ch-custom {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 700; color: var(--success);
+  background: rgba(134, 239, 172, 0.1); border: 1px solid rgba(134, 239, 172, 0.4);
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.ch-custom:hover { box-shadow: 0 0 12px rgba(134,239,172,0.35); }
+.ch-custom input { width: 26px; height: 20px; border: 0; background: none; cursor: pointer; padding: 0; }
+
+/* Purple Pro buttons + badges (crosshair tab only — rest of app stays gold). */
+.pro-tag.pro-purple { background: linear-gradient(135deg, #7C5CFF, #B794FF); color: #fff; }
+.ch-pro-btn {
+  background: linear-gradient(135deg, #7C5CFF, #B794FF) !important;
+  border-color: transparent !important; color: #fff !important; font-weight: 700;
+  white-space: nowrap;
+}
+.ch-pro-btn:hover:not(:disabled) { box-shadow: 0 0 20px rgba(157,123,255,0.6) !important; border-color: transparent !important; }
+.ch-pro-btn.small { padding: 6px 13px; font-size: 11.5px; }
+.ch-pro-btn.locked { opacity: 0.75; }
+
+/* Saved designs + layers. */
+.ch-saved-row, .ch-layer-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 9px; padding: 9px 12px; margin-bottom: 8px;
+  font-size: 12.5px; transition: all 0.2s var(--ease);
+  animation: pageIn 0.22s var(--ease);
+}
+.ch-saved-row:hover, .ch-layer-row:hover { border-color: rgba(157,123,255,0.45); box-shadow: 0 0 12px rgba(157,123,255,0.18); }
+.ch-saved-row b, .ch-layer-row b { flex: 1; font-weight: 600; }
+.ch-saved-row small { color: var(--faint); font-size: 11px; }
+.ch-layer-dot { width: 12px; height: 12px; border-radius: 50%; min-width: 12px; }
+.ch-mini-btn {
+  border: 1px solid var(--border-dim); background: rgba(var(--panel2-rgb), 0.6);
+  color: var(--text); border-radius: 7px; padding: 4px 10px; font-size: 11px;
+  cursor: pointer; transition: all 0.18s var(--ease); font-weight: 600;
+}
+.ch-mini-btn:hover { border-color: #9D7BFF; box-shadow: 0 0 10px rgba(157,123,255,0.4); }
+.ch-mini-btn.danger:hover { border-color: var(--error); box-shadow: 0 0 10px rgba(248,113,113,0.4); }
+.ch-pro-card { border-color: rgba(157, 123, 255, 0.3); }
+.ch-pro-card.locked-pro { position: relative; }
+.ch-pro-card.locked-pro .ch-sliders { opacity: 0.45; filter: saturate(0.6); pointer-events: none; }
+
+/* Pro sliders. */
+.ch-sliders { display: flex; flex-direction: column; gap: 10px; }
+.ch-sliders label {
+  display: grid; grid-template-columns: 110px 44px 1fr; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--dim); font-weight: 600;
+}
+.ch-sliders label span { color: var(--text); font-variant-numeric: tabular-nums; }
+.ch-sliders input[type="range"] { width: 100%; accent-color: #9D7BFF; cursor: pointer; }
+
+/* Preview + big toggle (right column). */
+.ch-preview-card { text-align: center; }
+#ch-preview {
+  position: relative; height: 190px; border-radius: 10px; overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(157,123,255,0.14), transparent 65%),
+    rgba(var(--deep-rgb), 0.65);
+  border: 1px solid var(--border-dim);
+}
+#ch-preview::before, #ch-preview::after {
+  content: '+'; position: absolute; color: rgba(134,239,172,0.5);
+  font-size: 16px; font-weight: 700;
+}
+#ch-preview::before { top: 8px; right: 12px; }
+#ch-preview::after { bottom: 8px; left: 12px; }
+#ch-preview-svg { width: 100%; height: 100%; }
+.ch-toggle {
+  width: 100%; padding: 13px; font-size: 14px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #7C5CFF, #B794FF);
+  border: 0; border-radius: 11px; cursor: pointer;
+  transition: all 0.22s var(--ease);
+  animation: btnPulse 2.4s var(--ease) infinite;
+}
+.ch-toggle:hover { box-shadow: 0 0 24px rgba(157,123,255,0.65); transform: translateY(-1px); }
+.ch-toggle:active { transform: scale(0.97); }
+.ch-toggle.on { background: linear-gradient(135deg, #1f9d55, #34D399); animation: none; }
+.ch-hint { font-size: 12px; line-height: 1.55; }
+body.lite .ch-toggle { animation: none; }
+body.lite .ch-preset.selected, body.lite .ch-pro-btn:hover:not(:disabled), body.lite .ch-toggle:hover { box-shadow: none; }
+
+@media (max-width: 1100px) {
+  .ch-layout { grid-template-columns: 1fr; }
+  .ch-side { position: static; }
+  .ch-preset-grid { grid-template-columns: repeat(4, 1fr); }
+}

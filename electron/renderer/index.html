@@ -159,6 +159,10 @@
         <svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>
         <span>Power</span><i class="crown">👑</i>
       </button>
+      <button class="nav-item" data-tab="crosshair">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="3.2"/></svg>
+        <span>Crosshair</span>
+      </button>
       <div class="nav-sep"><span>SYSTEM</span></div>
       <button class="nav-item" data-tab="restore">
         <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9.5 9.5 0 00-7 3.3L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg>
@@ -391,6 +395,61 @@
       <div class="glass card lockable" data-pro-group><div class="tweak-list" data-tweaks="power"></div></div>
     </section>
 
+    <section class="page" id="page-crosshair">
+      <div class="page-head"><h1>Crosshair</h1><p>Transparent overlay for borderless games · click-through, Alt+drag to move</p></div>
+      <div class="glass card ch-banner">
+        <span class="ch-dot"></span>
+        <p id="ch-banner-text">You're on the free crosshair. Three presets, in any color you like. Pro unlocks layers, shapes, sizes and position, and lets you save your own designs.</p>
+        <button class="btn ch-pro-btn" id="ch-unlock">Unlock · $15</button>
+      </div>
+      <div class="ch-layout">
+        <div class="ch-main">
+          <div class="glass card">
+            <h3>Presets</h3>
+            <div id="ch-presets" class="ch-preset-grid"></div>
+          </div>
+          <div class="glass card">
+            <h3>Color</h3>
+            <div class="ch-color-row">
+              <div id="ch-colors" class="ch-swatches"></div>
+              <label class="ch-custom">Custom<input type="color" id="ch-custom-color" value="#22ff88" /></label>
+            </div>
+            <p class="dim">Pick any color you like. Shape, size and position unlock with <b>Pro</b>.</p>
+          </div>
+          <div class="glass card">
+            <div class="ch-card-head"><h3>My crosshairs</h3><button class="btn ch-pro-btn small" id="ch-save">Save current</button></div>
+            <div id="ch-saved"><p class="dim">Nothing saved yet. Build a crosshair you like, then Save current.</p></div>
+          </div>
+          <div class="glass card">
+            <div class="ch-card-head"><h3>Layers <span class="pro-tag pro-purple">PRO</span></h3><button class="btn ch-pro-btn small" id="ch-add-layer">+ Add</button></div>
+            <div id="ch-layers"></div>
+          </div>
+          <div class="glass card ch-pro-card">
+            <h3>Size · Position · Opacity <span class="pro-tag pro-purple">PRO</span></h3>
+            <div class="ch-sliders">
+              <label>Size <span id="ch-size-v">22</span><input type="range" id="ch-size" min="4" max="80" value="22" /></label>
+              <label>Thickness <span id="ch-thick-v">3</span><input type="range" id="ch-thick" min="1" max="12" value="3" /></label>
+              <label>Opacity <span id="ch-op-v">100%</span><input type="range" id="ch-opacity" min="10" max="100" value="100" /></label>
+              <label>Position X <span id="ch-x-v">0</span><input type="range" id="ch-x" min="-500" max="500" value="0" /></label>
+              <label>Position Y <span id="ch-y-v">0</span><input type="range" id="ch-y" min="-500" max="500" value="0" /></label>
+            </div>
+          </div>
+        </div>
+        <div class="ch-side">
+          <div class="glass card ch-preview-card">
+            <h3>✦ Preview</h3>
+            <div id="ch-preview"><svg id="ch-preview-svg" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg"></svg></div>
+          </div>
+          <button class="btn ch-toggle" id="ch-toggle">⏻&nbsp; Turn crosshair on</button>
+          <p class="dim ch-hint">Run your game in borderless or windowed mode so the overlay can draw on top of it.</p>
+          <div class="row">
+            <button class="btn secondary" id="ch-reset" title="Snap back to the center of the primary screen">⌖&nbsp; Reset to center</button>
+          </div>
+          <p class="dim ch-hint">Hold <b>Alt</b> and drag the overlay to move it · <b>Ctrl+Alt+Shift+R</b> recenters.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="page" id="page-restore">
       <div class="page-head"><h1>Safety &amp; Restore</h1><p>Restore points and undo — available to everyone</p></div>
       <div class="glass card">
@@ -554,6 +613,7 @@
 <script src="tabs/debloat.js" defer></script>
 <script src="tabs/privacy.js" defer></script>
 <script src="tabs/power.js" defer></script>
+<script src="tabs/crosshair.js" defer></script>
 <script src="tabs/presets.js" defer></script>
 <script src="tabs/library.js" defer></script>
 <script src="tabs/restore.js" defer></script>
