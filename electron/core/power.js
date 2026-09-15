@@ -117,6 +117,18 @@ async function disableModernStandby() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Connected Standby (PlatformAoAcOverride=0): stops the always-on network
+ * wake path that pairs with Modern Standby. NEEDS REBOOT. */
+async function disableAoAc() {
+  try {
+    const { regSetDword } = require('./exec');
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Control\\Power', 'PlatformAoAcOverride', 0);
+    return r.ok
+      ? { ok: true, message: 'Connected Standby off — REBOOT.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 /* Lid close = do nothing (AC only): for docked laptops driving monitors.
  * Bag-carriers beware — your laptop stays ON when you shut it. */
 async function lidCloseNothing() {
@@ -164,5 +176,5 @@ module.exports = {
   unlockUltimatePerformance, setHighPerformance, setBalancedPlan,
   disableUSBSelectiveSuspend, disableDiskSleep,
   setMinProcessorState100, disablePcieLinkState, disableModernStandby,
-  lidCloseNothing, sleepNever, noAutoHibernate, activeCooling,
+  disableAoAc, lidCloseNothing, sleepNever, noAutoHibernate, activeCooling,
 };

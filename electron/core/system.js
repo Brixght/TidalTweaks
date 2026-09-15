@@ -114,8 +114,24 @@ async function noAutoRebootBSOD() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* Keep TRIM enabled (DisableDeleteNotify=0): SSDs stay fast and healthy.
+ * Previous value captured → true undo (dev default is 0 = enabled). */
+async function trimOn() {
+  try {
+    const prev = await fsutilGet('DisableDeleteNotify');
+    const r = await runCmd('fsutil', ['behavior', 'set', 'DisableDeleteNotify', '0'], 60000);
+    if (r.code !== 0) return { ok: false, message: 'fsutil failed (run as admin).' };
+    return {
+      ok: true, message: `TRIM enforced${prev !== null ? ` (was ${prev})` : ''}.`,
+      revert: prev !== null
+        ? { kind: 'cmdline', file: 'fsutil', args: ['behavior', 'set', 'DisableDeleteNotify', prev], label: 'TRIM setting restored.' }
+        : { kind: 'none' },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   verboseBoot, bsodDetails, fastShutdown, storageSense,
-  noLastAccess, no8dot3,
+  noLastAccess, no8dot3, trimOn,
   bootMenuLegacy, miniDumps, noAutoRebootBSOD,
 };

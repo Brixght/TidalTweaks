@@ -96,13 +96,39 @@
   $('ping-go').onclick = ping;
   $('dns-go').onclick = dns;
   $('lat-go').onclick = latency;
-  TT.renderTweaks(document.querySelector('[data-tweaks="net-free"]'), [
-    'net-flush-dns', 'net-qos-limit',
+  // Spec sections: DNS & ADAPTER (§1), LATENCY & THROUGHPUT (§2), then the
+  // remaining internet tweaks. Reused ids (game-no-nagle, …) render in the
+  // Gaming tab too — same catalog, same confirm modals, same undo.
+  TT.renderTweaks(document.querySelector('[data-tweaks="net-dns"]'), [
+    'net-fast-dns-pair', 'net-nic-powersave-off', 'net-dns-tune',
+    'net-no-delack', 'net-delack-zero', 'net-tcp-heuristics',
+    'net-no-neg-cache', 'net-tcp-scale', 'net-tcp-sack',
   ]);
-  TT.renderTweaks(document.querySelector('[data-tweaks="net"]'),
-    ['net-timed-wait', 'net-max-user-port',
-     'net-fast-dns-cloudflare', 'net-fast-dns-google', 'net-no-smb-limit',
-     'net-nic-powersave-off', 'net-nic-eco-off', 'net-reset-stack',
-     'net-ecn-on', 'net-rsc-off', 'net-no-tunnel', 'net-adapter-restart']);
+  TT.renderTweaks(document.querySelector('[data-tweaks="net-latency"]'), [
+    'game-no-nagle', 'game-net-throttle-off', 'net-tcp-autotune', 'net-qos-limit',
+  ]);
+  TT.renderTweaks(document.querySelector('[data-tweaks="net-more"]'), [
+    'net-fast-dns-cloudflare', 'net-fast-dns-google', 'net-flush-dns',
+    'net-no-smb-limit', 'net-ecn-on', 'net-rsc-off', 'net-no-tunnel',
+    'net-adapter-restart', 'net-nic-eco-off', 'net-timed-wait',
+    'net-max-user-port', 'net-reset-stack',
+  ]);
+  // Unlock button + preview banner follow the license tier.
+  const unl = $('net-unlock');
+  if (unl) unl.onclick = () => {
+    if (TT.pro) return;
+    TT.toast('🔒 Internet tweaks need Pro ($15) — opening Settings…', 'gold', 3500);
+    TT.switchTab('settings');
+  };
+  TT._show.network = async () => {
+    try { await TT.refreshLicense(false); } catch (e) { /* best-effort */ }
+    const banner = $('net-banner');
+    if (banner) banner.hidden = TT.pro;
+    if (unl) {
+      unl.textContent = TT.pro ? 'Pro active ✓' : '👑 Unlock · $15';
+      unl.disabled = TT.pro;
+      unl.style.opacity = TT.pro ? '0.6' : '1';
+    }
+  };
   drawGraph();
 })();

@@ -78,8 +78,18 @@ const cleaner = require('./core/cleaner');
 const startup = require('./core/startup');
 const ram = require('./core/ram');
 const systemTweaks = require('./core/system'); // boot behavior + NTFS (sys-*, disk-*)
+const memTweaks = require('./core/memory'); // low-level memory management (mem-*)
 const presets = require('./core/presets'); // one-click stacks (see core/presets.js)
 const crosshair = require('./core/crosshair'); // transparent overlay (see core/crosshair.js)
+const potatoFortnite = require('./core/games/fortnite'); // Potato Graphics profiles
+const potatoRivals = require('./core/games/marvelrivals');
+const biosInfo = require('./core/bios'); // WMI motherboard detect (BIOS tab vendor paths)
+const taskTweaks = require('./core/tasks'); // scheduled-task disables (task-*)
+const servicesIdx = require('./core/services/index'); // 7-section Services tab data
+const servicesApply = require('./core/services/apply'); // generic service/task applier
+const bench = require('./core/benchmark'); // standardized local benchmarks (no deps)
+const gameProfiles = require('./core/profiles'); // per-game tweak bundles + auto-apply
+const conn = require('./core/connection'); // online/offline mode (local detect, no backend)
 
 /* Every tweak id the UI can invoke, mapped to its core module + the backup
  * label used for undo. Registration is centralised here so the renderer only
@@ -103,6 +113,12 @@ const TWEAK_REGISTRY = {
   'cpu-x2apic': cpuTweaks.enableX2Apic,
   'cpu-timer-res': cpuTweaks.timerResolutionOn,
   'cpu-no-idle-states': cpuTweaks.disableIdleStates,
+  'cpu-distribute-timers': cpuTweaks.distributeTimers,
+  'mem-no-compression': memTweaks.disableCompression,
+  'mem-large-cache': memTweaks.largeSystemCache,
+  'mem-no-prefetch': memTweaks.prefetchOff,
+  'mem-no-pagefile-clear': memTweaks.pagefileNoClear,
+  'mem-paging-exec': memTweaks.pagingExecutive,
   // — Gaming & latency (core/gpu.js) —
   'game-power-ultimate': powerTweaks.unlockUltimatePerformance,
   'game-bar-off': gamingTweaks.disableGameBar,
@@ -130,6 +146,15 @@ const TWEAK_REGISTRY = {
   // — Network & internet (core/network.js) —
   'net-timed-wait': netTweaks.setTimedWaitDelay,
   'net-max-user-port': netTweaks.setMaxUserPort,
+  'net-fast-dns-pair': netTweaks.setFastDNSPair,
+  'net-dns-tune': netTweaks.dnsFlushTune,
+  'net-no-neg-cache': netTweaks.noNegCache,
+  'net-no-delack': netTweaks.noDelAck,
+  'net-delack-zero': netTweaks.delAckTicksZero,
+  'net-tcp-heuristics': netTweaks.tcpHeuristicsOff,
+  'net-tcp-scale': netTweaks.tcpWindowScale,
+  'net-tcp-autotune': netTweaks.tcpAutotune,
+  'net-tcp-sack': netTweaks.tcpSack,
   'net-flush-dns': netTweaks.flushDNS,
   'net-fast-dns-cloudflare': netTweaks.setCloudflareDNS,
   'net-fast-dns-google': netTweaks.setGoogleDNS,
@@ -214,6 +239,7 @@ const TWEAK_REGISTRY = {
   'power-no-disk-sleep': powerTweaks.disableDiskSleep,
   'power-cpu-min-100': powerTweaks.setMinProcessorState100,
   'power-no-pcie': powerTweaks.disablePcieLinkState,
+  'power-no-aoac': powerTweaks.disableAoAc,
   'power-no-modern-standby': powerTweaks.disableModernStandby,
   'power-lid-nothing': powerTweaks.lidCloseNothing,
   'power-sleep-never': powerTweaks.sleepNever,
@@ -226,6 +252,7 @@ const TWEAK_REGISTRY = {
   'sys-storage-sense': systemTweaks.storageSense,
   'disk-no-lastaccess': systemTweaks.noLastAccess,
   'disk-no-8dot3': systemTweaks.no8dot3,
+  'disk-trim-on': systemTweaks.trimOn,
   'sys-boot-legacy': systemTweaks.bootMenuLegacy,
   'sys-minidump': systemTweaks.miniDumps,
   'sys-no-bsod-reboot': systemTweaks.noAutoRebootBSOD,
@@ -235,6 +262,8 @@ const TWEAK_REGISTRY = {
   'adv-no-delivery-opt': advancedTweaks.disableDeliveryOptimization,
   'adv-no-xbox-bar': advancedTweaks.disableXboxBar,
   'adv-no-bg-apps': advancedTweaks.disableBackgroundApps,
+  'adv-bg-policy': advancedTweaks.disableBackgroundAppsPolicy,
+  'adv-ndu-off': advancedTweaks.disableNduService,
   'adv-no-activity': advancedTweaks.disableActivityHistory,
   'adv-no-clipboard-hist': advancedTweaks.disableClipboardHistory,
   'adv-no-tips': advancedTweaks.disableTips,
@@ -257,8 +286,26 @@ const TWEAK_REGISTRY = {
   'svc-xbox-off': advancedTweaks.disableXboxServices,
   'svc-printer-off': advancedTweaks.disablePrinterService,
   'svc-bluetooth-off': advancedTweaks.disableBluetoothService,
-  // — Device latency (core/devices.js) — handled via tweak:device (see below)
+  'svc-remote-reg': advancedTweaks.disableRemoteRegistry,
+  'svc-bits-off': advancedTweaks.disableBITS,
+  'svc-trkwks-off': advancedTweaks.disableTrkWks,
+  'svc-gameinput-off': advancedTweaks.disableGameInput,
+  'svc-parental-off': advancedTweaks.disableParentalControls,
+  'svc-netbios-off': advancedTweaks.disableNetBIOSHelper,
+  'svc-telephony-off': advancedTweaks.disableTelephony,
+  'svc-themes-off': advancedTweaks.disableThemesService,
+  'svc-hyperv-off': advancedTweaks.disableHyperV,
+  'task-telemetry-off': taskTweaks.disableTelemetryTasks,
+  'task-maintenance-off': taskTweaks.disableMaintenanceTasks,
 };
+
+/* Data-driven Services-tab ids (~100): each runs the generic applier against
+ * its definition. Unknown ids stay Pro (tierOf default) — the only gate. */
+for (const [id, def] of Object.entries(servicesIdx.DEFS)) {
+  if (typeof TWEAK_REGISTRY[id] !== 'function') {
+    TWEAK_REGISTRY[id] = () => servicesApply.applyItem(def);
+  }
+}
 
 /* ==========================================================================
  * Window
@@ -327,6 +374,12 @@ app.whenReady().then(() => {
     crosshair.init({ BrowserWindow, screen, store, getMainWindow: () => win });
     crosshair.ensureWindow();
   } catch (e) { console.error('crosshair init failed:', String((e && e.message) || e)); }
+  // Connection mode: first probe decides the opening state (Online when the
+  // machine reaches the internet, Offline otherwise), pushed to the titlebar.
+  try {
+    conn.init({ store });
+    conn.checkOnline(conn.PROBE_TIMEOUT_MS).then(() => pushConnState()).catch(() => {});
+  } catch (e) { console.error('connection init failed:', String((e && e.message) || e)); }
   // Global hotkey: snap the crosshair back to the primary-screen center.
   // Recenter is a Position (Pro) feature — Free presses get a notice toast
   // in the main window instead of moving anything.
@@ -762,7 +815,13 @@ ipcMain.handle('license:validate', async (_e, { code }) => {
   const me = users.session();
   if (!me) return { ok: false, message: 'Log in first, then activate.' };
   try {
-    return license.claimCode(code, me.username);
+    const r = license.claimCode(code, me.username);
+    // Affiliate purchase credit: a referred account activating a paid tier
+    // pays the tier price forward into the referrer's local balance.
+    if (r && r.ok && typeof r.tier === 'number' && r.tier > 0) {
+      try { users.creditReferrer(me.username, TIER_PRICES[r.tier] || 0); } catch { /* never fail activation */ }
+    }
+    return r;
   } catch (err) {
     return { ok: false, message: String((err && err.message) || err) };
   }
@@ -780,6 +839,7 @@ ipcMain.handle('license:status', () => {
     lite: LITE, // effective lite mode (after auto-detection)
     litePref: store.get('liteMode') || 'auto',
     username: (me && me.username) || null,
+    displayName: (me && (me.displayName || me.username)) || null,
     role: (me && me.role) || null,
   };
 });
@@ -976,15 +1036,422 @@ ipcMain.handle('crosshair:load-saved', (_e, { index } = {}) => {
 });
 
 /* ==========================================================================
+ * Potato Graphics — one-click low-graphics game profiles (Pro).
+ * Game .ini files get a timestamped backup next to the original PLUS an
+ * undo-log entry (file revert), so Restore → Undo brings them back. No
+ * System Restore point here — that 30s hammer is for registry work, not
+ * game configs that already carry their own backup.
+ * ========================================================================== */
+const POTATO_GAMES = { fortnite: potatoFortnite, rivals: potatoRivals };
+const potatoProRequired = () => 'Potato Graphics needs Pro ($15) — activate in Settings.';
+ipcMain.handle('potato:list', () => {
+  try {
+    return { ok: true, games: [potatoFortnite.GAME, potatoRivals.GAME] };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('potato:detect', async () => {
+  try {
+    const games = {};
+    for (const [id, mod] of Object.entries(POTATO_GAMES)) {
+      try { games[id] = mod.detect(); }
+      catch (err) { games[id] = { found: false, message: String((err && err.message) || err) }; }
+    }
+    return { ok: true, games };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('potato:apply', async (_e, { game, resolution } = {}) => {
+  if (accountTier() < 2) return { ok: false, message: potatoProRequired() };
+  const mod = POTATO_GAMES[String(game || '')];
+  if (!mod) return { ok: false, message: 'Unknown game profile.' };
+  try {
+    const res = await mod.apply({ resolution });
+    if (res && res.ok) {
+      backup.logChange({ id: 'potato:' + mod.GAME.id, at: new Date().toISOString(), revert: res.revert || null });
+    }
+    return res;
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('potato:launch-args', (_e, { game } = {}) => {
+  // Informational (copy-paste manual setup) — visible to everyone.
+  const mod = POTATO_GAMES[String(game || '')];
+  if (!mod || typeof mod.getLaunchArgs !== 'function') return { ok: false, message: 'No launch args for that game.' };
+  return { ok: true, args: mod.getLaunchArgs() };
+});
+
+/* ==========================================================================
+ * BIOS tab — guided firmware checklist. Nothing here applies settings (the
+ * BIOS can't be scripted), so detection is informational and ungated; the
+ * guide modals are locked client-side and the content is static text.
+ * ========================================================================== */
+ipcMain.handle('bios:detect', () => biosInfo.detect());
+
+/* Services tab structure (7 sections, ~110 rows). Ungated like potato:list
+ * — Pro is enforced at apply time by tierOf (unknown ids default to Pro). */
+ipcMain.handle('services:list', () => {
+  try {
+    return { ok: true, sections: servicesIdx.listPayload() };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+
+/* ==========================================================================
+ * Benchmarks — local standardized workloads (core/benchmark.js). Ungated:
+ * measuring is free for everyone. bench:save snapshots the run PLUS the
+ * tweak ids on record at that moment (backup.history), so exports and
+ * before/after comparisons show what was active. GPU numbers are measured
+ * in the renderer (WebGL) and sent in with the save payload.
+ * ========================================================================== */
+let APP_VERSION = '2.4.3';
+try { APP_VERSION = require('./package.json').version || APP_VERSION; } catch { /* ignore */ }
+ipcMain.handle('bench:run-test', async (_e, { test, durationMs } = {}) => {
+  const t = String(test || '');
+  if (!['cpu', 'ram', 'disk'].includes(t)) return { ok: false, message: 'Unknown benchmark.' };
+  try {
+    return await bench.runTest(t, durationMs);
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('bench:history', () => {
+  try {
+    return { ok: true, runs: bench.loadHistory() };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('bench:save', (_e, { run } = {}) => {
+  try {
+    let tweakIds = [];
+    try {
+      const h = backup.history();
+      const list = (h && h.history) || [];
+      tweakIds = list.map((e) => e.id).filter(Boolean).slice(-200);
+    } catch { /* history is best-effort */ }
+    const full = { ...(run || {}), at: new Date().toISOString(), appVersion: APP_VERSION, tweaks: tweakIds };
+    const r = bench.saveRun(full);
+    if (!r.ok) return r;
+    return { ok: true, message: 'Run saved to history.', run: full };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+
+/* ==========================================================================
+ * Game profiles — per-game tweak bundles with runtime extras. Whole-gated
+ * like preset stacks (need = highest tier inside); ONE restore point + ONE
+ * undo entry per apply. Manual applies run everything; the auto-apply
+ * watchdog (15s poll below) runs tweaks + priority only — .ini edits and
+ * crosshair swaps never fire while a game is live.
+ * ========================================================================== */
+function allGameProfiles() {
+  let customs = [];
+  try {
+    customs = gameProfiles.readCustom()
+      .filter((p) => (p.tweaks || []).every((tid) => typeof TWEAK_REGISTRY[tid] === 'function'))
+      .map((p) => ({ ...p, custom: true }));
+  } catch { customs = []; }
+  return [...gameProfiles.PREBUILT.map((p) => ({ ...p, custom: false })), ...customs];
+}
+function findGameProfile(id) {
+  return allGameProfiles().find((p) => p.id === String(id || ''));
+}
+/* Bundle tier: highest tweak tier + Pro extras (HAGS, crosshair sync,
+ * Potato) at 2, Ultimate power plan at 1 (same as its standalone tweak). */
+function profileTier(p) {
+  const ids = [...(p.tweaks || []).map((tid) => tierOf(tid))];
+  if (p.hags) ids.push(2);
+  if (p.power === 'ultimate') ids.push(1);
+  if (p.crosshair) ids.push(0); // layer-0 shape/color is Free
+  if (p.potato) ids.push(2);
+  return Math.max(0, ...ids);
+}
+async function applyGameProfile(p, opts = {}) {
+  const need = profileTier(p);
+  if (accountTier() < need) {
+    return { ok: false, message: `This profile needs TidalTweaks ${TIER_NAMES[need]} ($${TIER_PRICES[need]}).` };
+  }
+  try {
+    await backup.ensureRestorePoint(`TidalTweaks profile ${p.id}`);
+    const reverts = [];
+    const lines = [];
+    let done = 0;
+    for (const tid of p.tweaks || []) {
+      const fn = TWEAK_REGISTRY[tid];
+      if (typeof fn !== 'function') { lines.push(`✗ ${tid}: unknown tweak`); continue; }
+      try {
+        const r = await fn();
+        if (r && r.ok) {
+          done++;
+          if (r.revert) (Array.isArray(r.revert) ? reverts.push(...r.revert) : reverts.push(r.revert));
+          lines.push(`✓ ${tid}`);
+        } else {
+          lines.push(`✗ ${tid}: ${(r && r.message) || 'failed'}`);
+        }
+      } catch (err) {
+        lines.push(`✗ ${tid}: ${String((err && err.message) || err)}`);
+      }
+    }
+    const notes = [];
+    // Priority boost (transient — Windows drops it when the game exits).
+    if (p.priority && (p.processes || []).length) {
+      try {
+        const pr = await gameProfiles.setPriority(p.processes, p.priority);
+        notes.push(pr.message || '');
+      } catch { /* priority is best-effort */ }
+    }
+    if (!opts.auto) {
+      if (p.hags) {
+        try {
+          const h = await gamingTweaks.enableHAGS();
+          if (h && h.ok) {
+            if (h.revert) reverts.push(h.revert);
+            notes.push('HAGS on (reboot to take effect).');
+          } else notes.push('HAGS skipped: ' + ((h && h.message) || 'failed'));
+        } catch { /* noted below */ }
+      }
+      if (p.power === 'ultimate') {
+        try {
+          const u = await powerTweaks.unlockUltimatePerformance();
+          if (u && u.ok) {
+            if (u.revert) reverts.push(u.revert);
+            notes.push('Ultimate Performance plan active.');
+          } else notes.push('Power plan skipped: ' + ((u && u.message) || 'failed'));
+        } catch { /* noted below */ }
+      }
+      if (p.crosshair && p.crosshair.shape) {
+        try {
+          const cur = crosshair.getConfig();
+          const l0 = { ...(cur.layers[0] || {}), shape: p.crosshair.shape, color: p.crosshair.color || cur.layers[0].color };
+          crosshair.setConfig({ layers: [l0, ...cur.layers.slice(1)] });
+          notes.push(`Crosshair → ${p.crosshair.shape}.`);
+        } catch { /* cosmetic */ }
+      }
+      // Potato edits live game configs: manual applies only, game restart
+      // needed afterwards. It logs its OWN undo entry (visible in history).
+      if (p.potato === 'fortnite') {
+        try {
+          const pf = await potatoFortnite.apply({});
+          notes.push(pf.message || '');
+        } catch { /* reported by its own toast path */ }
+      }
+    }
+    const undoId = (opts.auto ? 'profile:auto:' : 'profile:') + p.id;
+    if (done > 0 || reverts.length) {
+      backup.logChange({ id: undoId, at: new Date().toISOString(), revert: reverts });
+    }
+    const msg = done === (p.tweaks || []).length
+      ? `${p.name} profile applied (${done}/${(p.tweaks || []).length}).`
+      : `${p.name} profile partially applied (${done}/${(p.tweaks || []).length}).`;
+    return { ok: done > 0, message: msg, details: [...lines, ...notes.filter(Boolean)] };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+}
+ipcMain.handle('profiles:list', () => {
+  try {
+    const auto = store.get('profileAuto') || {};
+    return {
+      ok: true,
+      profiles: allGameProfiles().map((p) => {
+        const tier = profileTier(p);
+        return { ...p, tier, tierName: TIER_NAMES[tier] || 'Free', auto: !!auto[p.id] };
+      }),
+    };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('profiles:apply', async (_e, { id } = {}) => {
+  const p = findGameProfile(id);
+  if (!p) return { ok: false, message: 'Unknown game profile.' };
+  return applyGameProfile(p, { auto: false });
+});
+ipcMain.handle('profiles:revert', async (_e, { id } = {}) => {
+  try {
+    return await backup.revertOne('profile:' + String(id || ''));
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('profiles:create', (_e, { profile } = {}) => {
+  try {
+    const v = gameProfiles.validateProfile(profile || {});
+    if (!v.ok) return { ok: false, message: v.message };
+    const p = { ...profile, id: String(profile.id).toLowerCase(), icon: profile.icon || '🎮' };
+    if (!p.id.startsWith('custom-')) return { ok: false, message: 'Custom ids must start with "custom-".' };
+    const unknown = (p.tweaks || []).filter((tid) => typeof TWEAK_REGISTRY[tid] !== 'function');
+    if (unknown.length) return { ok: false, message: `Unknown tweak ids: ${unknown.slice(0, 5).join(', ')}.` };
+    const list = gameProfiles.readCustom();
+    if (list.some((x) => x.id === p.id) || findGameProfile(p.id)) {
+      return { ok: false, message: 'That profile id is taken.' };
+    }
+    list.push(p);
+    gameProfiles.writeCustom(list);
+    return { ok: true, message: `Profile “${p.name}” saved.` };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('profiles:delete', (_e, { id } = {}) => {
+  try {
+    const list = gameProfiles.readCustom();
+    const next = list.filter((p) => p.id !== String(id || ''));
+    if (next.length === list.length) return { ok: false, message: 'Custom profile not found (built-ins cannot be deleted).' };
+    gameProfiles.writeCustom(next);
+    const auto = store.get('profileAuto') || {};
+    delete auto[String(id || '')];
+    store.set('profileAuto', auto);
+    return { ok: true, message: 'Custom profile deleted.' };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('profiles:export', (_e, { id } = {}) => {
+  const p = findGameProfile(id);
+  if (!p) return { ok: false, message: 'Unknown game profile.' };
+  const { custom, tier, tierName, auto, ...clean } = p;
+  return { ok: true, json: JSON.stringify(clean, null, 2) };
+});
+ipcMain.handle('profiles:import', (_e, { data } = {}) => {
+  try {
+    const obj = typeof data === 'string' ? JSON.parse(data) : data;
+    const v = gameProfiles.validateProfile(obj || {});
+    if (!v.ok) return { ok: false, message: 'Import rejected: ' + v.message };
+    const unknown = (obj.tweaks || []).filter((tid) => typeof TWEAK_REGISTRY[tid] !== 'function');
+    if (unknown.length) return { ok: false, message: `Unknown tweak ids: ${unknown.slice(0, 5).join(', ')}.` };
+    // Imports always land as customs (built-in ids are protected).
+    let base = 'custom-' + String(obj.id || 'imported').replace(/^custom-/, '').replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'custom-imported';
+    const list = gameProfiles.readCustom();
+    let nid = base, i = 2;
+    while (list.some((x) => x.id === nid) || findGameProfile(nid)) nid = `${base}-${i++}`;
+    const clean = { ...obj, id: nid, icon: obj.icon || '🎮' };
+    list.push(clean);
+    gameProfiles.writeCustom(list);
+    return { ok: true, message: `Imported as “${clean.name}”.` };
+  } catch (err) {
+    return { ok: false, message: 'Import failed: ' + String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('profiles:encode', (_e, { id } = {}) => {
+  const p = findGameProfile(id);
+  if (!p) return { ok: false, message: 'Unknown game profile.' };
+  const { custom, tier, tierName, auto, ...clean } = p;
+  return gameProfiles.encodeShare(clean);
+});
+ipcMain.handle('profiles:decode', (_e, { code } = {}) => {
+  const r = gameProfiles.decodeShare(code);
+  if (!r.ok) return r;
+  const unknown = (r.profile.tweaks || []).filter((tid) => typeof TWEAK_REGISTRY[tid] !== 'function');
+  return { ok: true, profile: r.profile, unknown };
+});
+ipcMain.handle('profiles:set-auto', (_e, { id, enabled } = {}) => {
+  const p = findGameProfile(id);
+  if (!p) return { ok: false, message: 'Unknown game profile.' };
+  if (!(p.processes || []).length) return { ok: false, message: 'That profile has no processes to watch.' };
+  try {
+    const auto = store.get('profileAuto') || {};
+    if (enabled) auto[p.id] = true;
+    else delete auto[p.id];
+    store.set('profileAuto', auto);
+    return { ok: true, auto: !!auto[p.id] };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+
+/* Auto-apply watchdog: every 15s, apply (tweaks + priority) for newly seen
+ * watched games, revert when they close. Only runs while at least one
+ * profile has auto-apply on; a tasklist poll is the only cost. */
+const profileAutoActive = new Set();
+setInterval(async () => {
+  try {
+    const auto = store.get('profileAuto') || {};
+    const enabled = Object.keys(auto).filter((k) => auto[k]);
+    if (!enabled.length) {
+      for (const pid of [...profileAutoActive]) {
+        try { await backup.revertOne('profile:auto:' + pid); } catch { /* ignore */ }
+        profileAutoActive.delete(pid);
+      }
+      return;
+    }
+    const running = await gameProfiles.listRunning();
+    for (const pid of enabled) {
+      const p = findGameProfile(pid);
+      if (!p || !(p.processes || []).length) continue;
+      const up = p.processes.some((n) => running.has(String(n).toLowerCase()));
+      if (up && !profileAutoActive.has(pid)) {
+        const r = await applyGameProfile(p, { auto: true });
+        if (r && r.ok) profileAutoActive.add(pid);
+      } else if (!up && profileAutoActive.has(pid)) {
+        try { await backup.revertOne('profile:auto:' + pid); } catch { /* ignore */ }
+        profileAutoActive.delete(pid);
+      }
+    }
+    for (const pid of [...profileAutoActive]) {
+      if (!enabled.includes(pid)) {
+        try { await backup.revertOne('profile:auto:' + pid); } catch { /* ignore */ }
+        profileAutoActive.delete(pid);
+      }
+    }
+  } catch { /* watchdog never crashes the app */ }
+}, 15000);
+
+/* ==========================================================================
+ * Connection mode — local online/offline state (core/connection.js).
+ * Everything in the app runs locally either way; the mode only gates
+ * future server features and drives the titlebar dot. Probes are plain
+ * DNS lookups (free, anonymous); failures resolve Offline, never errors.
+ * ========================================================================== */
+function pushConnState() {
+  try {
+    if (win && !win.isDestroyed()) win.webContents.send('conn:state', conn.getState());
+  } catch { /* cosmetic */ }
+}
+ipcMain.handle('conn:get', () => {
+  try {
+    return conn.getState();
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('conn:check', async () => {
+  try {
+    await conn.checkOnline(conn.PROBE_TIMEOUT_MS);
+    const s = conn.getState();
+    pushConnState();
+    return s;
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+ipcMain.handle('conn:set', async (_e, { mode } = {}) => {
+  try {
+    const r = await conn.setMode(mode);
+    pushConnState();
+    return r;
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+
+/* ==========================================================================
  * Accounts — sign up / log in / owner management (see core/users.js).
  * Passwords never cross IPC in either direction except at entry; hashes stay
  * in the main process. Owner-only routes re-check the role on EVERY call.
  * The Owner PANEL has one more lock: the device passphrase (owner:* below).
  * ========================================================================== */
-ipcMain.handle('auth:signup', (_e, { username, password }) => users.signup(username, password));
+ipcMain.handle('auth:signup', (_e, data = {}) => users.signup(data || {}));
 
-ipcMain.handle('auth:login', (_e, { username, password }) => {
-  const r = users.login(username, password);
+ipcMain.handle('auth:login', (_e, { email, identifier, password, remember } = {}) => {
+  // identifier = legacy positional slot; email = new login field.
+  const r = users.login(email !== undefined ? email : identifier, password, remember);
   if (r.ok && store.get('pro')) {
     // One-time migration: a device license from before accounts existed
     // moves onto the first account that logs in. Runs exactly once.

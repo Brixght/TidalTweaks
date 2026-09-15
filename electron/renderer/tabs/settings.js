@@ -16,8 +16,19 @@
       ? `👑 ${tname} ACTIVE since ${(s.activatedAt || '').slice(0, 10)} — ${tier >= 3 ? 'everything' : 'all ' + tname + ' and below'} unlocked.`
       : 'FREE version — pick a tier below to unlock more tweaks.';
     $('account-line').textContent = s.username
-      ? `Signed in as ${s.username} (${s.role}) · ${tname}${tier >= 2 ? ' 👑' : ''}.`
+      ? `Signed in as ${s.displayName || s.username} (${s.role}) · ${tname}${tier >= 2 ? ' 👑' : ''}.`
       : 'Not signed in.';
+    // Referral + affiliate snapshot (local tracking until the website flow lands).
+    try {
+      const sess = await TT.api.auth.session();
+      const u = sess && sess.user;
+      const rl = $('referral-line');
+      if (rl) {
+        rl.textContent = u && u.referralCode
+          ? `Your referral code: ${u.referralCode} · ${u.referralSignups || 0} signup(s) · $${u.affiliateBalance || 0} affiliate balance. Share your code — signups and paid upgrades credit you here.`
+          : '';
+      }
+    } catch (e) { /* referral line is best-effort */ }
     paintPricing(tier);
     // Lite-mode toggle reflects the stored preference (auto/on/off).
     const liteSel = $('lite-mode');
@@ -187,7 +198,46 @@
   if (themeSel) themeSel.onchange = () => pushAppearance(true);
   if (accentSel) accentSel.onchange = () => pushAppearance(false);
 
-  TT._show.settings = () => { paint(); paintAppearance(); };
+  // — Connection mode (Online / Offline / Auto). Picking Online with no
+  //   internet returns a warning instead of lying — the user chooses.
+  async function paintConn() {
+    let s = null;
+    try { s = await TT.api.conn.get(); } catch (e) { /* offline-looking */ }
+    const mode = (s && s.mode) || 'auto';
+    document.querySelectorAll('.conn-mode').forEach((b) => {
+      b.classList.toggle('active-mode', b.dataset.mode === mode);
+    });
+    const st = $('conn-status');
+    if (st) {
+      st.textContent = !s ? 'Status unavailable.'
+        : `Mode: ${mode} · currently ${s.online ? 'Online' : 'Offline'}. Local features work either way.`;
+    }
+  }
+  document.querySelectorAll('.conn-mode').forEach((b) => {
+    b.onclick = async () => {
+      const want = b.dataset.mode;
+      let r;
+      try { r = await TT.api.conn.set(want); }
+      catch (e) { r = { ok: false, message: String(e) }; }
+      if (r && r.warning) {
+        const goOffline = await TT.confirm({
+          title: 'No connection detected',
+          body: 'No connection detected. Switch to Offline mode?',
+          okText: 'Switch to Offline',
+        });
+        if (goOffline) {
+          try { await TT.api.conn.set('offline'); } catch (e) { /* ignore */ }
+        }
+      } else if (r && !r.ok) {
+        TT.toast(r.message || 'Failed.', 'error', 4000);
+      }
+      if (window.TT && window.TT.conn) { try { await window.TT.conn.refresh(); } catch (e) { /* ignore */ } }
+      paintConn();
+    };
+  });
+
+  TT._show.settings = () => { paint(); paintAppearance(); paintConn(); };
   paint();
   paintAppearance();
+  paintConn();
 })();

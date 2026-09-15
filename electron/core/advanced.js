@@ -47,6 +47,16 @@ const disableBackgroundApps = () => wrap(async () => {
   return r.ok ? { ok: true, message: 'Background apps disabled.', revert: r.revert } : r;
 });
 
+/* Machine-wide policy twin: LetAppsRunInBackground=2 (force-deny) under the
+ * AppPrivacy policy key — covers all users, survives per-user toggles. */
+const disableBackgroundAppsPolicy = () => wrap(async () => {
+  const r = await regSetDword('HKLM', 'SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy', 'LetAppsRunInBackground', 2);
+  return r.ok ? { ok: true, message: 'Background apps force-denied (machine policy).', revert: r.revert } : r;
+});
+
+/* Network Data Usage driver (Ndu.sys): usage-tracking memory overhead. */
+const disableNduService = () => wrap(() => disableService('Ndu', 'Network Data Usage driver'));
+
 const disableActivityHistory = () => wrap(async () => {
   const a = await regSetDword('HKLM', 'SOFTWARE\\Policies\\Microsoft\\Windows\\System', 'EnableActivityFeed', 0);
   const b = await regSetDword('HKLM', 'SOFTWARE\\Policies\\Microsoft\\Windows\\System', 'PublishUserActivities', 0);
@@ -158,11 +168,40 @@ const disableFaxService = () => wrap(() => disableService('Fax', 'Fax service'))
 const disableInsiderService = () => wrap(() => disableService('wisvc', 'Windows Insider service'));
 const disableTouchKeyboard = () => wrap(() => disableService('TabletInputService', 'Touch Keyboard service'));
 
+/* Services-tab additions: each snapshots its start type (disableService) and
+ * reports "not installed" as success — absent services need no action. */
+const disableRemoteRegistry = () => wrap(() => disableService('RemoteRegistry', 'Remote Registry'));
+const disableBITS = () => wrap(() => disableService('BITS', 'Background Intelligent Transfer'));
+const disableTrkWks = () => wrap(() => disableService('TrkWks', 'Distributed Link Tracking'));
+const disableGameInput = () => wrap(() => disableService('GameInputSvc', 'GameInput service'));
+const disableParentalControls = () => wrap(() => disableService('WpcMonSvc', 'Parental Controls'));
+const disableNetBIOSHelper = () => wrap(() => disableService('lmhosts', 'TCP/IP NetBIOS Helper'));
+const disableTelephony = () => wrap(() => disableService('TapiSrv', 'Telephony'));
+const disableThemesService = () => wrap(() => disableService('Themes', 'Windows Themes service'));
+
+/* Hyper-V host pair (vmms + HvHost): for PCs that never virtualize. Kills
+ * VMs, Docker Desktop and WSL2 distros until reverted — modal warns. */
+const disableHyperV = () => wrap(async () => {
+  const reverts = [];
+  let touched = 0;
+  for (const svc of ['vmms', 'HvHost']) {
+    const r = await disableService(svc, `Hyper-V ${svc}`);
+    if (!r.ok) return r;
+    if (r.revert && r.revert.kind !== 'none') { reverts.push(r.revert); touched++; }
+  }
+  if (!touched) return { ok: true, message: 'Hyper-V services not installed — nothing to do.', revert: { kind: 'none' } };
+  return { ok: true, message: `Hyper-V host services disabled (${touched}).`, revert: reverts };
+});
+
 module.exports = {
   disableSearchIndexing, disableSysMain, disableDeliveryOptimization,
-  disableXboxBar, disableBackgroundApps, disableActivityHistory,
+  disableXboxBar, disableBackgroundApps, disableBackgroundAppsPolicy,
+  disableNduService, disableActivityHistory,
   disableClipboardHistory, disableTips, disableService,
   disableXboxServices, disablePrinterService, disableBluetoothService,
+  disableRemoteRegistry, disableBITS, disableTrkWks,
+  disableGameInput, disableParentalControls, disableNetBIOSHelper,
+  disableTelephony, disableThemesService, disableHyperV,
   disableCopilot, disableWidgets, disableNewsFeed, disableConsumerFeatures,
   disableBingSearch, disableSnapFlyout,
   disableSearchHighlights, disableErrorReporting, disableDriverUpdates,

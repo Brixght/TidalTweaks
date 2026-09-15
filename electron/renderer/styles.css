@@ -825,3 +825,224 @@ body.lite .ch-preset.selected, body.lite .ch-pro-btn:hover:not(:disabled), body.
 .ch-toggle:hover { box-shadow: 0 0 24px rgba(139,92,246,0.65); }
 .ch-preset.selected, .ch-shape.selected { border-color: #8B5CF6; }
 .btn.secondary.small { padding: 6px 13px; font-size: 11.5px; }
+
+/* ============================ Potato Graphics ============================
+ * Purple-bordered preview banner, game cards with icon + Safe/Caution chips,
+ * lock buttons for Free. Same glass language as the rest of the app. */
+.pot-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.pot-title { display: flex; align-items: center; gap: 12px; }
+.pot-title-icon { font-size: 30px; }
+.pot-title h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.3px; }
+.pot-title p { color: var(--faint); font-size: 13px; margin-top: 3px; }
+.pot-banner {
+  display: flex; align-items: flex-start; gap: 12px;
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 22px rgba(139,92,246,0.14);
+  animation: pageIn 0.25s var(--ease);
+}
+.pot-banner p { font-size: 12.5px; color: var(--dim); line-height: 1.55; }
+.pot-banner p b { color: var(--text); }
+.pot-eye { font-size: 18px; }
+.pot-card {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 10px; padding: 14px 15px; margin-bottom: 10px;
+  transition: all 0.2s var(--ease);
+  animation: pageIn 0.22s var(--ease);
+}
+.pot-card:hover { border-color: rgba(139,92,246,0.45); box-shadow: 0 0 14px rgba(139,92,246,0.18); }
+.pot-icon { font-size: 30px; min-width: 38px; text-align: center; }
+.pot-info { flex: 1; min-width: 0; }
+.pot-info b { font-size: 14px; }
+.pot-info > p { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+.pot-settings { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.pot-chip {
+  font-size: 11px; font-weight: 600; color: var(--dim);
+  background: rgba(var(--deep-rgb), 0.6);
+  border: 1px solid var(--border-dim); border-radius: 14px;
+  padding: 3px 6px 3px 10px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.safe-tag {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: #081733;
+  background: linear-gradient(135deg, var(--success), #c0f5d4);
+  padding: 1px 7px; border-radius: 10px; white-space: nowrap;
+}
+.caution-tag {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: #081733;
+  background: linear-gradient(135deg, #FBBF24, #FDE68A);
+  padding: 1px 7px; border-radius: 10px; white-space: nowrap;
+}
+/* Reboot-required badge on tweak cards (renderTweaks, all tabs). */
+.reboot-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--dim);
+  border: 1px solid var(--border); padding: 2px 8px; border-radius: 12px;
+  vertical-align: 2px; white-space: nowrap;
+}
+
+/* ============================ Services tab ===============================
+ * Collapsible sections, Advanced (red/orange) badge, danger-row edge.
+ * Rows reuse .tweak-card; the search input reuses .input. */
+.svc-sec { margin-bottom: 6px; }
+.svc-sec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; padding: 12px 4px 10px;
+  user-select: none;
+}
+.svc-sec-head b { font-size: 14px; font-weight: 700; }
+.svc-sec-head:hover b { color: #fff; }
+.svc-chev { color: var(--faint); font-size: 13px; transition: transform 0.2s var(--ease); }
+.svc-sec.collapsed .svc-chev { transform: rotate(-90deg); }
+.svc-sec.collapsed .svc-rows, .svc-sec.collapsed .svc-note { display: none; }
+.svc-note { margin: 0 4px 10px !important; }
+.adv-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #fff;
+  background: linear-gradient(135deg, #c0392b, #FB923C);
+  padding: 2px 8px; border-radius: 12px; vertical-align: 2px; white-space: nowrap;
+  box-shadow: 0 0 10px rgba(251, 146, 60, 0.35);
+}
+.tweak-card.svc-danger { border-left: 3px solid var(--error); }
+#modal-check-wrap { margin: 12px 0 4px; font-size: 13px; color: var(--dim); }
+#modal-check-wrap[hidden] { display: none; }
+body.lite .svc-sec-head:hover b { color: inherit; }
+
+/* ============================ Benchmark ==================================
+ * All motion stays on the GPU (transform/opacity keyframes + width
+ * transitions on the standard easing): shimmer sweep while a test runs,
+ * count-up numbers via TT.countUp, delta arrows pop in. Lite mode kills
+ * the shimmer sweep but keeps the width transitions. */
+.bench-dur.active-dur { border-color: var(--accent); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45); color: #fff; }
+/* Indeterminate shimmer: a soft highlight sweeping the bar while busy. */
+.bar-fill.bench-busy { position: relative; overflow: hidden; }
+.bar-fill.bench-busy::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.45) 50%, transparent 80%);
+  animation: benchShimmer 1.2s var(--ease) infinite; /* GPU transform sweep */
+}
+@keyframes benchShimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+#bench-gpu-canvas, #bench-hist-graph {
+  width: 100%; background: rgba(var(--deep-rgb), 0.6);
+  border: 1px solid var(--border-dim); border-radius: 10px; margin: 10px 0;
+}
+#bench-gpu-canvas { height: 180px; }
+#bench-hist-graph { height: 180px; }
+
+/* ============================ Profiles ===================================
+ * Category headers with counts, card grid with hover lift (transform +
+ * glow, same GPU-composited easing as everywhere). Lite keeps layout,
+ * drops the lift glow. */
+.prof-cat-head {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 2px 10px;
+}
+.prof-cat-head b { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; }
+.prof-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px; margin-bottom: 6px;
+}
+.prof-card {
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 11px; padding: 14px 15px;
+  transition: all 0.2s var(--ease); /* hover lift */
+  animation: pageIn 0.22s var(--ease);
+  min-width: 0;
+}
+.prof-card:hover {
+  transform: translateY(-3px); /* GPU lift */
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 0 16px rgba(var(--accent-rgb), 0.22);
+}
+.prof-top { display: flex; align-items: center; gap: 10px; }
+.prof-icon { font-size: 26px; }
+.prof-top b { font-size: 14px; }
+.prof-card > .dim { font-size: 12px; margin-top: 3px; }
+.prof-details { margin-top: 10px; }
+.prof-code {
+  flex: 1; min-width: 0; font: 600 11px Consolas, monospace; color: var(--dim);
+  background: rgba(var(--deep-rgb), 0.6); border: 1px solid var(--border-dim);
+  border-radius: 7px; padding: 6px 9px; overflow-x: auto; white-space: nowrap;
+  user-select: text;
+}
+.prof-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.prof-actions .btn { padding: 7px 14px; font-size: 12px; }
+body.lite .prof-card:hover { transform: none; box-shadow: none; }
+
+/* ============================ Connection dot =============================
+ * Titlebar presence: green pulsing Online, grey Offline. Transform/opacity
+ * only (GPU), matching the app's one-easing animation language. */
+.conn-dot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  color: var(--dim); border: 1px solid var(--border-dim);
+  padding: 3px 9px; border-radius: 20px;
+}
+.conn-dot em { font-style: normal; }
+.conn-dot i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.conn-dot.online { color: var(--success); border-color: rgba(134, 239, 172, 0.4); }
+.conn-dot.online i { background: var(--success); box-shadow: 0 0 8px rgba(134, 239, 172, 0.9); animation: connPulse 2s var(--ease) infinite; }
+@keyframes connPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.conn-mode.active-mode { border-color: var(--accent); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45); color: #fff; }
+body.lite .conn-dot.online i { animation: none; }
+.bench-delta { display: flex; align-items: center; gap: 10px; padding: 7px 4px; font-size: 13px; border-bottom: 1px solid rgba(var(--accent-rgb), 0.1); animation: pageIn 0.22s var(--ease); }
+.bench-delta b { flex: 1; font-weight: 600; }
+.bench-delta .up { color: var(--success); font-weight: 800; }
+.bench-delta .down { color: var(--error); font-weight: 800; }
+.bench-delta .flat { color: var(--faint); font-weight: 800; }
+body.lite .bar-fill.bench-busy::after { animation: none; }
+.pot-detect { margin-top: 8px !important; font-size: 11.5px !important; }
+.pot-actions { display: flex; align-items: center; }
+.pot-actions .btn { padding: 8px 18px; font-size: 12.5px; }
+.pot-locked { font-size: 15px !important; opacity: 0.8; }
+body.lite .pot-banner { box-shadow: none; }
+body.lite .pot-card:hover { box-shadow: none; }
+
+/* ============================ BIOS guides ================================
+ * Checklist rows (title + badges + purple impact dots + lock), vendor-tabbed
+ * guide modal with steps, copy-ready values block. Same glass language. */
+.bios-row {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(var(--deep-rgb), 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 10px; padding: 13px 15px; margin-bottom: 10px;
+  cursor: pointer; transition: all 0.2s var(--ease);
+  animation: pageIn 0.22s var(--ease);
+}
+.bios-row:hover { border-color: rgba(139,92,246,0.5); box-shadow: 0 0 14px rgba(139,92,246,0.2); transform: translateY(-1px); }
+.bios-row.locked { opacity: 0.75; }
+.bios-info { flex: 1; min-width: 0; }
+.bios-info b { font-size: 13.5px; }
+.bios-info p { font-size: 12px; color: var(--faint); margin-top: 3px; line-height: 1.45; }
+.bios-info .bios-path { color: var(--dim); font-size: 11.5px; }
+.impact { display: inline-flex; gap: 4px; vertical-align: 2px; }
+.impact i {
+  width: 8px; height: 8px; border-radius: 50%; background: #8B5CF6;
+  box-shadow: 0 0 7px rgba(139,92,246,0.8);
+}
+.bios-lock { font-size: 16px; color: var(--faint); min-width: 24px; text-align: center; }
+.bios-row:not(.locked) .bios-lock { color: #8B5CF6; font-size: 20px; font-weight: 800; }
+.bios-modal { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; }
+.bios-modal[hidden] { display: none; }
+.bios-modal .modal { width: 520px; max-height: 84vh; overflow-y: auto; }
+.bios-steps { margin: 12px 0; }
+.bios-steps ol { margin-left: 20px; font-size: 13px; color: var(--dim); line-height: 1.7; }
+.bios-values {
+  background: rgba(var(--deep-rgb), 0.6);
+  border: 1px solid var(--border-dim); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.bios-values pre {
+  flex: 1; font: 600 12px Consolas, monospace; color: var(--success);
+  white-space: pre-wrap; user-select: text;
+}
+.bios-values .btn { white-space: nowrap; }
+#bios-m-vendors .btn.active-vendor { border-color: #8B5CF6; box-shadow: 0 0 12px rgba(139,92,246,0.45); color: #fff; }
+body.lite .bios-row:hover { box-shadow: none; }

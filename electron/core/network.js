@@ -242,9 +242,211 @@ async function adapterRestart() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* ==========================================================================
+ * Potato-style TCP/DNS granularity (Network tab §1–2). Every writer below
+ * snapshots the previous value first so Restore → Undo brings it back.
+ * netsh global-state writes capture-then-restore; registry writes ride on
+ * regSetDword's built-in snapshot. Nothing here throws.
+ * ========================================================================== */
+function escRx(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/* UP physical adapter connection names (what netsh calls name="..."). */
+async function upAdapterNames() {
+  const r = await runPS(
+    `Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Select-Object -ExpandProperty Name`,
+    30000
+  );
+  return (r.stdout || '').split('\n').map((s) => s.trim()).filter(Boolean);
+}
+
+/* Current DNS picture per adapter: { ips[], dhcp }. */
+async function dnsServersOf(alias) {
+  const r = await runCmd('netsh', ['interface', 'ip', 'show', 'dnsservers', `name="${alias}"`], 30000);
+  const out = r.stdout || '';
+  const ips = [...out.matchAll(/(\d{1,3}(?:\.\d{1,3}){3})/g)].map((m) => m[1])
+    .filter((ip) => ip.split('.').every((o) => Number(o) <= 255));
+  return { ips, dhcp: /dhcp/i.test(out) && ips.length === 0 };
+}
+function dnsRevert(alias, prev) {
+  if (prev.dhcp && !prev.ips.length) {
+    return { kind: 'cmdline', file: 'netsh', args: ['interface', 'ip', 'set', 'dns', `name="${alias}"`, 'source=dhcp'], label: `DNS on '${alias}' back to DHCP.` };
+  }
+  // Restore first static server; extras ride in details (DHCP fallback note).
+  const first = prev.ips[0] || '8.8.8.8';
+  return { kind: 'cmdline', file: 'netsh', args: ['interface', 'ip', 'set', 'dns', `name="${alias}"`, 'static', first, 'primary'], label: `DNS on '${alias}' restored to ${first}.` };
+}
+
+/* Low-latency resolver PAIR: Cloudflare primary + Google secondary, every
+ * UP adapter, via netsh (previous servers or DHCP captured for undo). */
+async function setFastDNSPair() {
+  try {
+    const names = await upAdapterNames();
+    if (!names.length) return { ok: false, message: 'No active network adapter found.' };
+    const reverts = [];
+    for (const alias of names) {
+      const prev = await dnsServersOf(alias);
+      const a = await runCmd('netsh', ['interface', 'ip', 'set', 'dns', `name="${alias}"`, 'static', '1.1.1.1', 'primary'], 30000);
+      if (a.code !== 0) return { ok: false, message: `DNS set failed on '${alias}' (run as admin).` };
+      const b = await runCmd('netsh', ['interface', 'ip', 'add', 'dns', `name="${alias}"`, '8.8.8.8', 'index=2'], 30000);
+      if (b.code !== 0) return { ok: false, message: `Secondary DNS failed on '${alias}'.` };
+      reverts.push(dnsRevert(alias, prev));
+    }
+    return { ok: true, message: `DNS 1.1.1.1 + 8.8.8.8 on ${names.length} adapter(s).`, revert: reverts };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Flush + tune: ipconfig /flushdns AND negative caching off, so failed
+ * lookups retry immediately instead of being remembered. */
+async function dnsFlushTune() {
+  try {
+    const f = await runCmd('ipconfig', ['/flushdns'], 30000);
+    if (f.code !== 0) return { ok: false, message: 'ipconfig /flushdns failed.' };
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters', 'MaxNegativeCacheTtl', 0);
+    if (!r.ok) return { ok: false, message: r.message };
+    return { ok: true, message: 'DNS cache flushed + negative caching off.', revert: r.revert };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Failed lookups retry immediately (NXDOMAIN answers aren't remembered). */
+async function noNegCache() {
+  try {
+    const r = await regSetDword('HKLM', 'SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters', 'MaxNegativeCacheTtl', 0);
+    return r.ok
+      ? { ok: true, message: 'Negative DNS caching off.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Every Tcpip interface key under Parameters\Interfaces (same enumeration
+ * as the Nagle trio in gpu.js, split into granular steps). */
+async function listIfaceKeys() {
+  const list = await runCmd('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces'], 15000);
+  if (list.code !== 0) return [];
+  return list.stdout.split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^HKEY_LOCAL_MACHINE/i.test(l))
+    .map((l) => l.replace(/^HKEY_LOCAL_MACHINE\\/i, ''));
+}
+
+/* Delayed ACK off, granular: TcpAckFrequency=1 + TcpDelAckTicks=0. */
+async function noDelAck() {
+  try {
+    const ifaces = await listIfaceKeys();
+    if (!ifaces.length) return { ok: false, message: 'No network interfaces found.' };
+    const reverts = [];
+    for (const iface of ifaces) {
+      const a = await regSetDword('HKLM', iface, 'TcpAckFrequency', 1);
+      const c = await regSetDword('HKLM', iface, 'TcpDelAckTicks', 0);
+      if (!a.ok || !c.ok) return { ok: false, message: `Failed on ${iface}` };
+      reverts.push(a.revert, c.revert);
+    }
+    return { ok: true, message: `Delayed ACK off on ${ifaces.length} adapter(s).`, revert: reverts };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Zero delayed-ACK ticks alone (pairs with the tweak above). */
+async function delAckTicksZero() {
+  try {
+    const ifaces = await listIfaceKeys();
+    if (!ifaces.length) return { ok: false, message: 'No network interfaces found.' };
+    const reverts = [];
+    for (const iface of ifaces) {
+      const c = await regSetDword('HKLM', iface, 'TcpDelAckTicks', 0);
+      if (!c.ok) return { ok: false, message: `Failed on ${iface}` };
+      reverts.push(c.revert);
+    }
+    return { ok: true, message: `ACK ticks → 0 on ${ifaces.length} adapter(s).`, revert: reverts };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* --- netsh global-state writers: capture current → set → restore --- */
+async function tcpShowGlobal() {
+  const r = await runCmd('netsh', ['interface', 'tcp', 'show', 'global'], 30000);
+  return r.code === 0 ? (r.stdout || '') : '';
+}
+function tcpState(out, label) {
+  const m = new RegExp(`${escRx(label)}\\s*:\\s*(\\S+)`, 'i').exec(out || '');
+  return m ? m[1].toLowerCase() : '';
+}
+const AUTO_LEVELS = ['disabled', 'highlyrestricted', 'restricted', 'normal', 'experimental'];
+const ON_OFF = ['enabled', 'disabled'];
+
+/* Windows scaling heuristics off (stops Windows overriding window scaling). */
+async function tcpHeuristicsOff() {
+  try {
+    const h = await runCmd('netsh', ['interface', 'tcp', 'show', 'heuristics'], 30000);
+    let prev = tcpState(h.stdout, 'Window Scaling heuristics');
+    if (!ON_OFF.includes(prev)) prev = 'disabled'; // documented default
+    const r = await runCmd('netsh', ['interface', 'tcp', 'set', 'heuristics', 'disabled'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'TCP scaling heuristics disabled.',
+      revert: { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'heuristics', prev], label: `Heuristics back to ${prev}.` },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Window scaling on: autotuning normal + RSS enabled (both Windows
+ * defaults — this repairs drift; previous values captured for undo). */
+async function tcpWindowScale() {
+  try {
+    const out = await tcpShowGlobal();
+    let auto = tcpState(out, 'Receive Window Auto-Tuning Level');
+    if (!AUTO_LEVELS.includes(auto)) auto = 'normal';
+    let rss = tcpState(out, 'Receive-Side Scaling State');
+    if (!ON_OFF.includes(rss)) rss = 'enabled';
+    const a = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'autotuninglevel=normal'], 30000);
+    const b = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'rss=enabled'], 30000);
+    if (a.code !== 0 || b.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'Autotuning normal + RSS enabled.',
+      revert: [
+        { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', `autotuninglevel=${auto}`], label: `Autotuning back to ${auto}.` },
+        { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', `rss=${rss}`], label: `RSS back to ${rss}.` },
+      ],
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Autotuning normal alone (pairs with the tweak above, which adds RSS). */
+async function tcpAutotune() {
+  try {
+    const out = await tcpShowGlobal();
+    let auto = tcpState(out, 'Receive Window Auto-Tuning Level');
+    if (!AUTO_LEVELS.includes(auto)) auto = 'normal';
+    const a = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'autotuninglevel=normal'], 30000);
+    if (a.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'TCP autotuning → normal.',
+      revert: { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', `autotuninglevel=${auto}`], label: `Autotuning back to ${auto}.` },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
+/* Selective ACK on: faster recovery from packet loss. */
+async function tcpSack() {
+  try {
+    const out = await tcpShowGlobal();
+    let prev = tcpState(out, 'SACK');
+    if (!ON_OFF.includes(prev)) prev = 'enabled'; // documented default
+    const r = await runCmd('netsh', ['interface', 'tcp', 'set', 'global', 'sack=enabled'], 30000);
+    if (r.code !== 0) return { ok: false, message: 'netsh failed (run as admin).' };
+    return {
+      ok: true, message: 'Selective ACK enabled.',
+      revert: { kind: 'cmdline', file: 'netsh', args: ['interface', 'tcp', 'set', 'global', `sack=${prev}`], label: `SACK back to ${prev}.` },
+    };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 module.exports = {
   ping, dnsLookup, setTimedWaitDelay, setMaxUserPort, flushDNS,
-  setCloudflareDNS, setGoogleDNS, disableSMBBandwidthLimit,
+  setCloudflareDNS, setGoogleDNS, setFastDNSPair, dnsFlushTune, noNegCache,
+  disableSMBBandwidthLimit,
   nicPowersaveOff, nicEcoOff, qosLimitZero, resetStack,
   ecnOn, rscOff, tunnelsOff, adapterRestart,
+  noDelAck, delAckTicksZero, tcpHeuristicsOff,
+  tcpWindowScale, tcpAutotune, tcpSack,
+  tcpState, // test hook (netsh output parsing) — see license.js setUsedStore
 };

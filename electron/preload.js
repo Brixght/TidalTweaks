@@ -109,6 +109,53 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // — Crosshair overlay (separate transparent always-on-top window) —
+  // — BIOS tab: WMI motherboard detect (informational, ungated — guides
+  //   are static text locked client-side) —
+  bios: {
+    detect: () => ipcRenderer.invoke('bios:detect'),
+  },
+  // — Services tab structure (ungated; Pro enforced at apply time) —
+  services: {
+    list: () => ipcRenderer.invoke('services:list'),
+  },
+  // — Connection mode (local detect; gates future server features) —
+  conn: {
+    get: () => ipcRenderer.invoke('conn:get'),
+    check: () => ipcRenderer.invoke('conn:check'),
+    set: (mode) => ipcRenderer.invoke('conn:set', { mode }),
+    onState: (cb) => {
+      const listener = (_e, state) => cb(state);
+      ipcRenderer.on('conn:state', listener);
+      return () => ipcRenderer.removeListener('conn:state', listener);
+    },
+  },
+  // — Benchmarks (local workloads; measuring is free, history is local) —
+  bench: {
+    runTest: (test, durationMs) => ipcRenderer.invoke('bench:run-test', { test, durationMs }),
+    history: () => ipcRenderer.invoke('bench:history'),
+    save: (run) => ipcRenderer.invoke('bench:save', { run }),
+  },
+  // — Game profiles (bundles + auto-apply; tier enforced at apply time) —
+  profiles: {
+    list: () => ipcRenderer.invoke('profiles:list'),
+    apply: (id) => ipcRenderer.invoke('profiles:apply', { id }),
+    revert: (id) => ipcRenderer.invoke('profiles:revert', { id }),
+    create: (profile) => ipcRenderer.invoke('profiles:create', { profile }),
+    remove: (id) => ipcRenderer.invoke('profiles:delete', { id }),
+    exportJson: (id) => ipcRenderer.invoke('profiles:export', { id }),
+    importJson: (data) => ipcRenderer.invoke('profiles:import', { data }),
+    encode: (id) => ipcRenderer.invoke('profiles:encode', { id }),
+    decode: (code) => ipcRenderer.invoke('profiles:decode', { code }),
+    setAuto: (id, enabled) => ipcRenderer.invoke('profiles:set-auto', { id, enabled }),
+  },
+  // — Potato Graphics profiles (Pro-gated in main; list/detect/launch-args
+  //   are informational and visible to everyone) —
+  potato: {
+    list: () => ipcRenderer.invoke('potato:list'),
+    detect: () => ipcRenderer.invoke('potato:detect'),
+    apply: (game, resolution) => ipcRenderer.invoke('potato:apply', { game, resolution }),
+    launchArgs: (game) => ipcRenderer.invoke('potato:launch-args', { game }),
+  },
   //   get/set/toggle/reset go through main (Pro-gated there); onUpdate
   //   subscribes to live pushes for the overlay + the tab preview.
   crosshair: {
@@ -137,11 +184,12 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
-  // — Accounts (device-local, see core/users.js). Passwords only travel at
-  //   entry (signup/login/change); everything else passes usernames/roles. —
+  // — Accounts (device-local, see core/users.js). Identity is email-based;
+  //   login takes { email, password, remember }, signup takes
+  //   { displayName, email, password, referralCode, remember }. —
   auth: {
-    signup: (username, password) => ipcRenderer.invoke('auth:signup', { username, password }),
-    login: (username, password) => ipcRenderer.invoke('auth:login', { username, password }),
+    signup: (data) => ipcRenderer.invoke('auth:signup', data || {}),
+    login: (email, password, remember) => ipcRenderer.invoke('auth:login', { email, password, remember }),
     logout: () => ipcRenderer.invoke('auth:logout'),
     session: () => ipcRenderer.invoke('auth:session'),
     list: () => ipcRenderer.invoke('auth:list'),

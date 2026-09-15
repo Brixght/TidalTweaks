@@ -134,6 +134,11 @@ async function applyRevert(d) {
         try { require('node:fs').rmSync(d.script, { force: true }); } catch { /* gone already */ }
         return { ok: true, message: `Scheduled task '${d.name}' removed.` };
       }
+      case 'schtask-toggle': { // restore a disabled/enabled task to its prior State
+        const enable = String(d.prev || '').toLowerCase() !== 'disabled';
+        await runCmd('schtasks', ['/Change', '/TN', d.task, enable ? '/Enable' : '/Disable'], 60000);
+        return { ok: true, message: `Task '${d.task}' restored (${enable ? 'enabled' : 'disabled'}).` };
+      }
       case 'regkey': { // whole-key backup: delete the key we created
         await runCmd('reg', ['delete', `${d.root}\\${d.path}`, '/f'], 15000);
         return { ok: true, message: 'Registry key removed.' };

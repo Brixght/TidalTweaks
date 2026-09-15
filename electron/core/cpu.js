@@ -69,6 +69,17 @@ async function enableTimerSerialization() {
   } catch (e) { return { ok: false, message: String(e) }; }
 }
 
+/* DistributeTimers=1: spreads timer interrupts across cores instead of
+ * piling them on core 0. NEEDS REBOOT. Pairs with timer serialization. */
+async function distributeTimers() {
+  try {
+    const r = await regSetDword('HKLM', KERNEL, 'DistributeTimers', 1);
+    return r.ok
+      ? { ok: true, message: 'Timer interrupts distributed — REBOOT.', revert: r.revert }
+      : { ok: false, message: r.message };
+  } catch (e) { return { ok: false, message: String(e) }; }
+}
+
 /* EnergyEstimationEnabled=0: drops the energy-estimation engine overhead. */
 async function disableEnergyEstimation() {
   try {
@@ -265,5 +276,5 @@ module.exports = {
   disableHibernation, setMinProcessorState100, disablePcieLinkState,
   biosClockUTC, setForegroundPriority, disableDynamicTick, tscSyncEnhanced,
   disableSpeculativeMitigations, enableX2Apic, timerResolutionOn, killTimerHolder,
-  disableIdleStates,
+  disableIdleStates, distributeTimers,
 };

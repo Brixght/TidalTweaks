@@ -76,14 +76,18 @@
   /* --------------------------- confirm modal ------------------------------
    * Returns a Promise<boolean> normally. With { input: {placeholder,
    * password} } it shows a text field and resolves to the typed string on OK
-   * (or null on cancel) — used for password resets etc. */
+   * (or null on cancel) — used for password resets etc. With
+   * { danger: true } the OK button turns red; with { check: 'label' } a
+   * checkbox must be ticked before OK enables (aggressive Services rows). */
   function confirmAction(opts) {
     opts = opts || {};
     return new Promise((resolve) => {
       const root = $('#modal-root');
       $('#modal-title').textContent = opts.title || 'Are you sure?';
       $('#modal-body').textContent = opts.body || '';
-      $('#modal-ok').textContent = opts.okText || 'Apply';
+      const okBtn = $('#modal-ok');
+      okBtn.textContent = opts.okText || 'Apply';
+      okBtn.className = 'btn ' + (opts.danger ? 'danger' : 'primary');
       const input = $('#modal-input');
       const useInput = !!opts.input;
       input.hidden = !useInput;
@@ -92,13 +96,33 @@
         input.placeholder = (opts.input && opts.input.placeholder) || '';
         input.type = (opts.input && opts.input.password) ? 'password' : 'text';
       }
+      // Understanding checkbox (unchecked → OK disabled).
+      const checkWrap = $('#modal-check-wrap');
+      const checkBox = $('#modal-check');
+      const useCheck = !!opts.check;
+      if (checkWrap) {
+        checkWrap.hidden = !useCheck;
+        if (useCheck) {
+          $('#modal-check-label').textContent = opts.check;
+          checkBox.checked = false;
+          okBtn.disabled = true;
+          checkBox.onchange = () => { okBtn.disabled = !checkBox.checked; };
+        } else {
+          okBtn.disabled = false;
+          checkBox.onchange = null;
+        }
+      }
       root.hidden = false;
       if (useInput) setTimeout(() => input.focus(), 60);
       const done = (v) => {
         $('#modal-ok').onclick = $('#modal-cancel').onclick = null;
         input.onkeydown = null;
+        if (checkBox) checkBox.onchange = null;
         root.hidden = true;
         input.hidden = true;
+        if (checkWrap) checkWrap.hidden = true;
+        okBtn.disabled = false;
+        okBtn.className = 'btn primary';
         resolve(v);
       };
       $('#modal-ok').onclick = () => done(useInput ? input.value : true);
@@ -170,6 +194,15 @@
     'net-rsc-off': { os: 'both', t: 'Receive Segment Coalescing off', d: 'Trades a little bulk throughput for lower, steadier latency.', m: 'Will run netsh interface tcp set global rsc=disabled.\nIf downloads get slower, revert.' },
     'net-no-tunnel': { os: 'both', t: 'Dead transition tunnels off', d: 'Disables Teredo/6to4/ISATAP — less surface, fewer weird tunnels.', m: 'Will disable all three transition technologies.\n⚠ Xbox party chat uses Teredo — revert if party chat breaks.' },
     'net-adapter-restart': { os: 'both', t: 'Restart network adapters', d: 'Disable → enable every up adapter. The classic repair button.', m: 'Will bounce every active physical adapter.\n5–10s connection blip, no reboot. Nothing is uninstalled.' },
+    'net-fast-dns-pair': { os: 'both', t: 'Low-latency DNS pair (1.1.1.1 + 8.8.8.8)', d: 'Cloudflare primary, Google secondary on every active adapter — if one resolver hiccups, the other answers.', m: 'Will set static DNS 1.1.1.1 (primary) + 8.8.8.8 (secondary) on every UP adapter via netsh.\nPrevious servers (or DHCP) are captured for undo. Brief DNS blip possible.' },
+    'net-dns-tune': { os: 'both', t: 'Flush + tune DNS cache', d: 'Flushes the resolver cache and stops remembering failed lookups.', m: 'Will run ipconfig /flushdns and set MaxNegativeCacheTtl=0.\nSlightly more upstream queries after failures — the price of fresh answers. Reversible.' },
+    'net-no-neg-cache': { os: 'both', t: 'No negative DNS caching', d: 'Failed lookups retry immediately instead of being remembered.', m: 'Will set MaxNegativeCacheTtl=0 under the Dnscache Parameters key.\nMore upstream queries after NXDOMAINs — negligible on broadband. Reversible.' },
+    'net-no-delack': { os: 'both', t: 'Disable delayed ACK', d: 'TcpAckFrequency=1 + TcpDelAckTicks=0 per adapter — ACKs go out immediately.', m: 'Will write both values under every interface in Tcpip\\Parameters\\Interfaces.\nSlightly more upstream ACK traffic; lower latency in twitch games. Reversible.' },
+    'net-delack-zero': { os: 'both', t: 'Zero delayed ACK ticks', d: 'TcpDelAckTicks=0 per adapter — completes the Nagle disable.', m: 'Pairs with Disable delayed ACK (which sets the same value alongside TcpAckFrequency).\nApply both for the full effect. Reversible.' },
+    'net-tcp-heuristics': { os: 'both', t: 'Scaling heuristics off', d: 'Stops Windows overriding your TCP window-scaling decisions.', m: 'Will run netsh int tcp set heuristics disabled.\nPrevious state is captured for undo.' },
+    'net-tcp-scale': { os: 'both', t: 'TCP window scaling on', d: 'Autotuning normal + Receive Side Scaling for modern-link throughput.', m: 'Will set autotuninglevel=normal and rss=enabled.\nBoth are Windows defaults — this repairs machines where something changed them. Previous values captured for undo.' },
+    'net-tcp-autotune': { os: 'both', t: 'TCP autotuning normal', d: 'Balanced window scaling for steady throughput.', m: 'Will set autotuninglevel=normal.\nPairs with TCP window scaling (which also enables RSS). Previous value captured for undo.' },
+    'net-tcp-sack': { os: 'both', t: 'Selective ACK on', d: 'Recovers from packet loss faster.', m: 'Will set sack=enabled.\nThe Windows default — repairs drift. Previous value captured for undo.' },
     // ————— Performance & CPU —————
     'cpu-boost-mode': { t: 'Processor boost mode (unlock + Aggressive)', d: 'Unhides the boost setting (Attributes 0→2) then sets Aggressive.', m: 'Will set Attributes=2 on be337238-0d82-4146-a960-4f3749d470c7 to unhide it, then set the boost policy to Aggressive (3).\nMore boost = more heat. Watch thermals on laptops.' },
     'cpu-no-throttle': { t: 'Disable CPU power throttling', d: 'PowerThrottlingOff=1 — stops Windows parking/clocking down cores.', m: 'Will set PowerThrottlingOff=1 in the power policy keys. Higher idle power draw.' },
@@ -247,6 +280,18 @@
     'svc-xbox-off': { t: 'Disable Xbox services', d: 'XblAuthManager, XblGameSave, XboxGipSvc, XboxNetApiSvc → disabled.', m: 'Will stop and disable the four Xbox services.\nXbox app sign-in and Game Bar companions stop working. Reversible.' },
     'svc-printer-off': { t: 'Disable Print Spooler', d: 'Spooler → disabled. For PCs that never print.', m: 'Will stop and disable the Print Spooler.\nYou will NOT be able to print until re-enabled.' },
     'svc-bluetooth-off': { t: 'Disable Bluetooth services', d: 'bthserv → disabled. For desktops with no BT hardware.', m: 'Will stop and disable the Bluetooth service.\nBT audio and devices may drop until re-enabled.' },
+    // ————— Services tab additions (services + scheduled tasks) —————
+    'svc-remote-reg': { os: 'both', t: 'Disable Remote Registry', d: 'Closes remote registry access for a security win.', m: 'Will stop and disable the Remote Registry service.\nNothing on a home PC needs remote registry. Reversible.' },
+    'svc-bits-off': { os: 'both', t: 'Disable Background Transfer (BITS)', d: 'Background file transfer used by Windows Update.', m: '⚠ Will stop and disable BITS.\nWindows Update and Store downloads may stall until re-enabled. Only for metered/offline-style setups.' },
+    'svc-trkwks-off': { os: 'both', t: 'Disable Distributed Link Tracking', d: 'Maintains NTFS links across the network. Rarely needed.', m: 'Will stop and disable the TrkWks service.\nStale network shortcuts may not self-heal. Reversible.' },
+    'svc-gameinput-off': { os: 'both', t: 'Disable GameInput service', d: 'GameInput API backend. Skip if controllers act up.', m: 'Will stop and disable the GameInput service.\nIf a gamepad stops working afterwards, revert. Reversible.' },
+    'svc-parental-off': { os: 'both', t: 'Disable Parental Controls', d: 'Family Safety backend. Only if no child accounts need it.', m: '⚠ Will stop and disable Parental Controls (WpcMonSvc).\nFamily Safety screen-time and filters stop working. Reversible.' },
+    'svc-netbios-off': { os: 'both', t: 'Disable TCP/IP NetBIOS Helper', d: 'Legacy name resolution. Ancient printers may need it.', m: 'Will stop and disable the NetBIOS Helper (lmhosts).\nVery old network printers/shares can break. Reversible.' },
+    'svc-telephony-off': { os: 'both', t: 'Disable Telephony', d: 'Dial-up/fax modem backend. Dead tech on most PCs.', m: 'Will stop and disable the Telephony service.\nFax modems and dial-up stop working. Reversible.' },
+    'svc-themes-off': { os: 'both', t: 'Disable Windows Themes service', d: 'Only if you do not care about visual themes.', m: '⚠ Will stop and disable the Themes service.\nWindows falls back to the basic un-themed look until re-enabled.' },
+    'svc-hyperv-off': { os: 'both', t: 'Disable Hyper-V services', d: 'Host virtualization off. Only if you never virtualize.', m: '⚠ Will stop and disable the Hyper-V host services (vmms, HvHost).\nVirtual machines, Docker Desktop and WSL2 distros will NOT start until re-enabled. Skip if you use any of them.' },
+    'task-telemetry-off': { os: 'both', t: 'Disable telemetry scheduled tasks', d: 'Clears CEIP, compatibility appraiser and related tasks.', m: 'Will DISABLE (not delete) 6 tasks under Application Experience + Customer Experience Improvement Program.\nPrevious states are captured — Undo re-enables exactly what was on. Missing tasks are skipped.' },
+    'task-maintenance-off': { os: 'both', t: 'Disable maintenance auto-runs', d: 'Stops idle-time automatic maintenance from interrupting.', m: '⚠ Will DISABLE Idle + Regular Maintenance tasks.\nWindows stops its idle-time tune-ups — run them manually from Control Panel → Security and Maintenance when wanted. Undo re-enables.' },
     // ————— Privacy & security —————
     'priv-no-telemetry': { t: 'Disable telemetry', d: 'AllowTelemetry=0 — minimum diagnostic data to Microsoft.', m: 'Will set AllowTelemetry=0 under HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection.' },
     'priv-no-adid': { t: 'Disable advertising ID', d: 'Per-app ad tracking ID off (HKCU AdvertisingInfo).', m: 'Will set HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo Enabled=0.' },
@@ -302,6 +347,17 @@
     'debloat-chrome-bg': { os: 'both', t: 'Chrome: no background mode', d: 'Chrome fully exits instead of idling in the tray.', m: 'Will set the BackgroundModeEnabled enterprise policy to 0.\nTakes effect for Chrome installs (restart Chrome).' },
     'debloat-cortana-app': { os: 'both', t: 'Remove Cortana app', d: 'Removes the Cortana AppX package for your user.', m: 'Will remove Microsoft.549981C3F5F10 via Remove-AppxPackage.\nReinstall from the Store if you miss her.' },
     'debloat-xbox-app': { os: 'both', t: 'Remove Xbox app', d: 'Removes the Xbox AppX — GamingServices left alone.', m: 'Will remove Microsoft.XboxApp only.\nStore games and Game Bar companions keep working.' },
+    // ————— Memory & kernel (Advanced tab) —————
+    'mem-no-compression': { os: 'both', t: 'Memory compression off', d: 'Frees CPU by turning off the compression store (16GB+ rigs won\'t miss the RAM).', m: 'Will run Disable-MMAgent -mc.\nTrade-off: the RAM compression used to save now stays resident. Reversible with one Undo.' },
+    'mem-large-cache': { os: 'both', t: 'Large system cache', d: 'Adjusts the paged pool / cache balance for desktops doing heavy file + game I/O.', m: 'Will set LargeSystemCache=1.\nREQUIRES REBOOT. Server-flavored tuning — revert if anything feels off.' },
+    'mem-no-prefetch': { os: 'both', t: 'Prefetch + Superfetch off', d: 'Recommended for NVMe drives to cut idle disk churn.', m: 'Will set EnablePrefetcher=0 and EnableSuperfetch=0.\nREBOOT to settle. HDD users should skip this (or keep SysMain).' },
+    'mem-no-pagefile-clear': { os: 'both', t: 'No pagefile wipe at shutdown', d: 'Removes a slow shutdown step that buys nothing on home PCs.', m: 'Will set ClearPageFileAtShutdown=0.\nTakes effect on the next shutdown. Reversible.' },
+    'mem-paging-exec': { os: 'both', t: 'Kernel locked in RAM', d: 'Stops the kernel paging to disk. Needs RAM headroom — skip on 8GB.', m: 'Will set DisablePagingExecutive=1.\nREQUIRES REBOOT. Do not apply on 8GB machines.' },
+    'cpu-distribute-timers': { os: 'both', t: 'Distribute timers across cores', d: 'Spreads timer interrupts instead of piling them on core 0.', m: 'Will set DistributeTimers=1 in the kernel key.\nREQUIRES REBOOT. Pairs with timer serialization.' },
+    'adv-bg-policy': { os: 'both', t: 'Block background apps (machine policy)', d: 'Policy-level force-deny covering all users — survives per-user toggles.', m: 'Will set LetAppsRunInBackground=2 under the AppPrivacy policy key.\nStronger than the per-user switch. Reversible.' },
+    'adv-ndu-off': { os: 'both', t: 'Network Data Usage driver off', d: 'Frees memory used by usage tracking (Ndu.sys).', m: 'Will stop and disable the Ndu service.\nSettings → Network usage stats stop updating. Reversible.' },
+    'power-no-aoac': { os: 'both', t: 'Connected Standby off', d: 'Stops background network wake (PlatformAoAcOverride=0).', m: 'Will set PlatformAoAcOverride=0.\nREQUIRES REBOOT. Pairs with Modern Standby off for real S3 sleep.' },
+    'disk-trim-on': { os: 'both', t: 'Keep TRIM enabled', d: 'Maintains SSD health and speed (enforces DisableDeleteNotify=0).', m: 'Will enforce DisableDeleteNotify=0 via fsutil (your previous value is captured for undo).\nAlready the default on healthy machines — this repairs drift.' },
   };
 
   /* TIER MIRROR — must match main.js BASE_TWEAKS/EXTREME_TWEAKS/FREE flags
@@ -327,6 +383,55 @@
     'cpu-x2apic', 'cpu-timer-res',
     'priv-lsa', 'priv-credential-guard', 'debloat-edge',
     'priv-no-rdp', 'priv-no-smb1', 'net-reset-stack',
+  ]);
+  /* IMPACT — expected effect per tweak, 1 (minor) to 3 (biggest wins).
+   * Unlisted tweaks default to 2. Rendered as purple dots on every card
+   * (BIOS/Network rows use the same scale). */
+  const IMPACT = {
+    'game-mode-master': 3, 'game-power-ultimate': 3, 'power-ultimate': 3,
+    'game-hags-on': 3, 'game-no-nagle': 3, 'game-net-throttle-off': 3,
+    'net-qos-limit': 3, 'net-fast-dns-pair': 3, 'net-no-delack': 3,
+    'net-delack-zero': 3, 'cpu-timer-res': 3, 'cpu-no-parking': 3,
+    'cpu-min-state-100': 3, 'adv-no-sysmain': 3,
+    'cpu-boost-mode': 3, 'cpu-no-spec-mit': 3, 'power-no-pcie': 3,
+    'cpu-no-pcie-link': 3, 'debloat-visual-fx': 3, 'ram-standby-task': 3,
+    'task-telemetry-off': 3, 'priv-no-telemetry-svc': 3,
+    'net-dns-tune': 1, 'net-no-neg-cache': 1, 'net-tcp-sack': 1,
+    'net-flush-dns': 1, 'vis-taskbar-seconds': 1, 'vis-classic-clock': 1,
+    'vis-numlock': 1, 'vis-no-taskview': 1, 'vis-no-chat': 1,
+    'game-no-fs-optim': 3, 'gpu-msi-mode': 3,
+    'game-bg-apps-off': 3, 'adv-bg-policy': 3, 'mem-no-compression': 3,
+    'disk-no-8dot3': 1, 'disk-no-lastaccess': 1, 'mem-no-pagefile-clear': 1,
+    'adv-ndu-off': 1,
+    'cpu-bios-utc': 1, 'priv-no-feedback': 1, 'priv-no-autoplay': 1,
+    'adv-no-tips': 1, 'sys-verbose-boot': 1, 'sys-bsod-details': 1,
+    'vis-classic-alttab': 1, 'vis-no-shake': 1, 'debloat-chrome-bg': 1,
+    'svc-maps-off': 1, 'svc-pca-off': 1, 'svc-geo-off': 1, 'svc-fax-off': 1,
+    'svc-printer-off': 1, 'svc-bluetooth-off': 1, 'svc-remote-reg': 1,
+    'svc-trkwks-off': 1, 'svc-gameinput-off': 1, 'svc-parental-off': 1,
+    'svc-netbios-off': 1, 'svc-telephony-off': 1, 'svc-themes-off': 1,
+    'svc-bits-off': 2, 'svc-xbox-off': 2, 'svc-hyperv-off': 2,
+    'task-maintenance-off': 2,
+    'svc-insider-off': 1, 'svc-touchkbd-off': 1, 'sys-minidump': 1,
+    'vis-menu-delay': 1, 'vis-extensions': 1, 'vis-hidden-files': 1,
+    'vis-no-sticky': 1, 'vis-no-toggle-keys': 1, 'vis-no-taskbar-search': 1,
+    'vis-no-thumbs-network': 1, 'debloat-cortana-app': 1, 'adv-no-news': 1,
+  };
+  function impactOf(id) {
+    const meta = TWEAKS[id];
+    const v = (meta && meta.impact) || IMPACT[id] || 2;
+    return Math.min(3, Math.max(1, Number(v) || 2));
+  }
+  /* REBOOT — tweaks that need a restart to take effect. Rendered as a
+   * ⟲ badge on every card (all tabs). */
+  const REBOOT_IDS = new Set([
+    'game-hags-on', 'gpu-msi-mode', 'gpu-amd-ulps',
+    'cpu-no-dynamictick', 'cpu-tsc-enhanced', 'cpu-x2apic', 'cpu-no-spec-mit',
+    'cpu-distribute-timers', 'cpu-timer-serialization',
+    'power-no-modern-standby', 'power-no-aoac',
+    'mem-large-cache', 'mem-no-prefetch', 'mem-paging-exec',
+    'net-nic-powersave-off', 'net-nic-eco-off', 'net-reset-stack',
+    'priv-lsa', 'priv-credential-guard', 'priv-no-smb1',
   ]);
   function tierOf(id) {
     const meta = TWEAKS[id];
@@ -383,6 +488,20 @@
       osBadge.textContent = osv === 'both' ? '10 · 11' : (osv === 'win11' ? 'Win 11' : 'Win 10');
       osBadge.title = osv === 'both' ? 'Works on Windows 10 and 11' : ('Windows ' + (osv === 'win11' ? '11' : '10') + ' only');
       b.append(' ', osBadge);
+      // Impact dots: 1–3 purple, same scale as the BIOS/Network rows.
+      const imp = impactOf(id);
+      const dots = document.createElement('span');
+      dots.className = 'impact';
+      dots.title = `Impact ${imp}/3`;
+      for (let i = 0; i < imp; i++) dots.appendChild(document.createElement('i'));
+      b.append(' ', dots);
+      if (REBOOT_IDS.has(id)) {
+        const rb = document.createElement('span');
+        rb.className = 'reboot-tag';
+        rb.textContent = '⟲ reboot';
+        rb.title = 'Requires a restart to take effect';
+        b.append(' ', rb);
+      }
       const p = document.createElement('p');
       p.textContent = meta.d;
       info.append(b, p);
@@ -459,7 +578,7 @@
       document.body.classList.toggle('lite', !!s.lite);
       // Personal greeting (the Risxn "Welcome, User!" touch — we have accounts).
       const dashTitle = $('#dash-title');
-      if (dashTitle) dashTitle.textContent = s.username ? `Welcome, ${s.username}!` : 'Dashboard';
+      if (dashTitle) dashTitle.textContent = s.username ? `Welcome, ${s.displayName || s.username}!` : 'Dashboard';
       // Owner section is revealed by role (main process re-checks on every
       // owner IPC call, so hiding here is UX, not security).
       const ownerBtn = $('#nav-owner');
@@ -516,16 +635,21 @@
     $('#auth-tab-login').onclick = () => show('login');
     $('#auth-tab-signup').onclick = () => show('signup');
     const doLogin = async () => {
-      const r = await api.auth.login($('#login-user').value, $('#login-pass').value)
+      const r = await api.auth.login($('#login-email').value, $('#login-pass').value, $('#login-remember').checked)
         .catch((e) => ({ ok: false, message: String(e) }));
       if (r && r.ok) location.reload();
-      else authError((r && r.message) || 'Login failed.');
+      else authError((r && r.message) || 'Sign in failed.');
     };
     const doSignup = async () => {
       const p1 = $('#signup-pass').value || '';
       if (p1 !== ($('#signup-pass2').value || '')) { authError('Passwords do not match.'); return; }
-      const r = await api.auth.signup($('#signup-user').value, p1)
-        .catch((e) => ({ ok: false, message: String(e) }));
+      const r = await api.auth.signup({
+        displayName: $('#signup-name').value,
+        email: $('#signup-email').value,
+        password: p1,
+        referralCode: $('#signup-ref').value,
+        remember: $('#signup-remember').checked,
+      }).catch((e) => ({ ok: false, message: String(e) }));
       if (r && r.ok) {
         try { sessionStorage.setItem('tt-hello-owner', r.first ? '1' : ''); } catch (e) { /* ignore */ }
         location.reload();
@@ -533,14 +657,14 @@
     };
     $('#login-go').onclick = doLogin;
     $('#signup-go').onclick = doSignup;
-    ['login-user', 'login-pass'].forEach((id) => $('#' + id).addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); }));
-    ['signup-user', 'signup-pass', 'signup-pass2'].forEach((id) => $('#' + id).addEventListener('keydown', (e) => { if (e.key === 'Enter') doSignup(); }));
+    ['login-email', 'login-pass'].forEach((id) => $('#' + id).addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); }));
+    ['signup-name', 'signup-email', 'signup-pass', 'signup-pass2', 'signup-ref'].forEach((id) => $('#' + id).addEventListener('keydown', (e) => { if (e.key === 'Enter') doSignup(); }));
     show('login');
   }
 
   /* ------------------------------ router --------------------------------- */
-  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'tips', 'gaming',
-    'registry', 'debloat', 'privacy', 'power', 'crosshair', 'restore', 'settings', 'owner'];
+  const order = ['dashboard', 'cleaner', 'startup', 'ram', 'network', 'presets', 'library', 'tips', 'benchmark', 'profiles', 'gaming',
+    'registry', 'debloat', 'privacy', 'power', 'crosshair', 'potato', 'bios', 'advanced', 'services', 'restore', 'settings', 'owner'];
   let current = 'dashboard';
 
   function switchTab(id) {
@@ -586,7 +710,47 @@
     $('#btn-nav').onclick = () => apply(!document.body.classList.contains('nav-hidden'));
   }
 
-  /* ------------------------------ titlebar ------------------------------- */
+  /* ------------------------------ conn dot ------------------------------
+   * Titlebar presence + the gate every future online feature must check
+   * (TT.conn.isOnline()). Paints from conn:get, then follows live pushes.
+   * Grey while unknown so the UI never claims Online before the probe. */
+  const connState = { mode: 'auto', online: false, known: false };
+  function paintConnDot() {
+    const dot = $('#conn-dot');
+    if (!dot) return;
+    dot.classList.toggle('online', connState.known && connState.online);
+    dot.querySelector('em').textContent = !connState.known ? '…' : (connState.online ? 'Online' : 'Offline');
+    dot.title = !connState.known
+      ? 'Checking connection…'
+      : (connState.online ? `Online (mode: ${connState.mode})` : `Offline (mode: ${connState.mode}) — everything local still works`);
+  }
+  async function refreshConn() {
+    try {
+      const s = await api.conn.get();
+      if (s && s.ok !== false) {
+        connState.mode = s.mode || 'auto';
+        connState.online = !!s.online;
+        connState.known = true;
+        paintConnDot();
+      }
+    } catch (e) { /* dot stays grey — never crash the shell */ }
+    return connState;
+  }
+  function wireConn() {
+    paintConnDot();
+    try {
+      if (api.conn.onState) {
+        api.conn.onState((s) => {
+          if (!s || typeof s !== 'object') return;
+          if (s.mode) connState.mode = s.mode;
+          if (typeof s.online === 'boolean') connState.online = s.online;
+          connState.known = true;
+          paintConnDot();
+        });
+      }
+    } catch (e) { /* subscription is best-effort */ }
+    refreshConn();
+  }
   function wireTitlebar() {
     $('#btn-min').onclick = () => api.win.minimize();
     $('#btn-max').onclick = () => api.win.toggleMax();
@@ -610,6 +774,7 @@
     });
     wireTitlebar();
     wireSidebar();
+    wireConn();
     window.addEventListener('resize', moveGlider);
     $('#nav').addEventListener('scroll', moveGlider, { passive: true });
     wireAuth();
@@ -720,6 +885,12 @@
     get tier() { return licenseState.tier || 0; },
     get tierName() { return TIER_NAMES[licenseState.tier] || 'Free'; },
     get api() { return api; },
+    conn: {
+      // Gate for future online features: `if (!TT.conn.isOnline()) …`.
+      isOnline() { return connState.known && !!connState.online; },
+      get mode() { return connState.mode; },
+      refresh: refreshConn,
+    },
     _show: {}, // tabs register onShow callbacks: TT._show.ram = fn
   };
 })();

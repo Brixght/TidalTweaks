@@ -4,6 +4,36 @@ All notable changes, newest first. Version numbers match GitHub Releases
 (`TidalTweaks Setup X.Y.Z.exe`). Same-day releases happen when a fix can't
 wait — a higher number is always the one to download.
 
+## v2.4.4
+
+- **Benchmark tab (free)**: CPU single/multi (prime sieve + worker-thread
+  fan-out), RAM bandwidth + latency, disk MB/s + IOPS (self-cleaning 100MB
+  file), 30s WebGL GPU scene. Quick/Standard/Deep durations, before/after
+  deltas, history graph, CSV/JSON/PNG export — every run stamped with the
+  active tweak list.
+- **Game Profiles tab**: 12 prebuilt per-game bundles (all Free-safe) with
+  priority boost, launch options and extras; 15s auto-apply watchdog with
+  revert-on-exit; customs, JSON import/export, self-contained TT1P- share
+  codes (no server needed).
+- **Connection mode**: local online detection (plain DNS, no backend),
+  Auto/Online/Offline toggle in Settings, titlebar Online dot, honest
+  no-connection warning. Everything local works fully offline.
+- **Potato Graphics tab (Pro)**: Fortnite + Marvel Rivals low-graphics
+  profiles with timestamped backups, read-only handling and undo.
+- **BIOS guides tab (Pro)**: ReBAR, XMP/EXPO and C-State walkthroughs with
+  per-vendor paths (WMI auto-detect) and copy-ready values.
+- **Advanced tab (Pro)**: memory compression, large cache, prefetch,
+  paging executive, NDU, timers, AoAc standby, TRIM and more — with a new
+  ⟲ reboot badge everywhere it applies.
+- **Services tab (Pro)**: 7 collapsible sections, ~110 rows (services +
+  scheduled tasks) with Safe/Caution/Advanced badges, impact dots, search,
+  red-checkbox danger modals, per-row undo.
+- **Network tab rework**: DNS & Adapter + Latency & Throughput sections, 9
+  new TCP/DNS tweaks (pairs, delayed-ACK steps, heuristics, SACK…), impact
+  dots on every tweak card app-wide.
+- **Accounts**: email login, display names, remember-me, local referral
+  codes with signup counts and affiliate balances in Settings.
+
 ## v2.4.3
 
 - **Crosshair tab redesign (screenshot spec)**: MY CROSSHAIRS on top with
