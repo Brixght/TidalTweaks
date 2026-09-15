@@ -60,23 +60,6 @@ npm.cmd run build    # → electron/dist/TidalTweaks Setup X.Y.Z.exe
 > `npm` may be blocked by PowerShell's execution policy — use `npm.cmd`, or run
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-## 🔑 License codes (for the seller — offline, no server, no Cloudflare)
-
-Codes are **cryptographically signed** with your private Ed25519 key. The app
-verifies them fully offline — there is no backend to deploy, pay for, or maintain.
-
-- Your private key: `Documents\TidalTweaks-Codes\PRIVATE-KEY-do-not-share.pem`
-  (created once, **back it up on a USB stick** — lose it and you can never mint
-  more codes for this app version; leak it and anyone can mint unlimited codes)
-- Your 300 starter codes live next to it (`SIGNED-*-codes.txt`, 100 per tier)
-- Mint more anytime, no internet needed:
-  `node electron/scripts/mint-codes.js "<key-path>" <base|pro|extreme> <count> [out.txt]`
-- Each code activates **once, on that buyer's PC** (burned locally on claim)
-  **and expires** (signed expiry date — shared codes rot instead of living
-  forever; mint with `--days=N`, default 30, bulk inventory at 365)
-  Honest limit: two offline PCs can't compare notes, so a manually-shared code
-  could activate a second machine. At $5–30 instant delivery, a non-issue.
-
 ## 📁 Project layout
 
 ```

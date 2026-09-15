@@ -12,3 +12,5 @@ node_modules/
 *-codes.txt
 PRIVATE-KEY*
 *.pem
+# Seller ops notes — private, local only (never on GitHub)
+SELLER.md
