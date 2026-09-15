@@ -4,6 +4,14 @@ All notable changes, newest first. Version numbers match GitHub Releases
 (`TidalTweaks Setup X.Y.Z.exe`). Same-day releases happen when a fix can't
 wait — a higher number is always the one to download.
 
+## v2.4.2
+
+- **Crosshair overlay tab**: separate transparent always-on-top window for
+  borderless games — click-through, Alt+drag to move, Ctrl+Alt+Shift+R to
+  recenter. Free: Classic/Dot/Cross presets in any color. Pro: layered
+  crosshairs, T-Shape/Complex/Ring/Double/Plus-Dot library, size/position/
+  opacity sliders, save-custom designs.
+
 ## v2.4.1
 
 - **Scrollable preset + modal lists**: 60-tweak stacks no longer push their
