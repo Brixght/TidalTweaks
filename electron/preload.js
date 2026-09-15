@@ -121,11 +121,19 @@ contextBridge.exposeInMainWorld('api', {
     addLayer: (shape) => ipcRenderer.invoke('crosshair:add-layer', { shape }),
     removeLayer: (id) => ipcRenderer.invoke('crosshair:remove-layer', { id }),
     save: (name) => ipcRenderer.invoke('crosshair:save', { name }),
+    deleteSaved: (index) => ipcRenderer.invoke('crosshair:delete-saved', { index }),
     loadSaved: (index) => ipcRenderer.invoke('crosshair:load-saved', { index }),
     onUpdate: (cb) => {
       const listener = (_e, cfg) => cb(cfg);
       ipcRenderer.on('crosshair:update', listener);
       return () => ipcRenderer.removeListener('crosshair:update', listener);
+    },
+    // One-way notices from main (e.g. Pro-gate feedback for the global
+    // recenter hotkey, which has no IPC return path for a toast).
+    onNotice: (cb) => {
+      const listener = (_e, msg) => cb(msg);
+      ipcRenderer.on('crosshair:notice', listener);
+      return () => ipcRenderer.removeListener('crosshair:notice', listener);
     },
   },
 

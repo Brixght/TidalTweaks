@@ -4,6 +4,16 @@ All notable changes, newest first. Version numbers match GitHub Releases
 (`TidalTweaks Setup X.Y.Z.exe`). Same-day releases happen when a fix can't
 wait — a higher number is always the one to download.
 
+## v2.4.3
+
+- **Crosshair tab redesign (screenshot spec)**: MY CROSSHAIRS on top with
+  purple Save current, LAYERS with visibility squares and stacking explainer,
+  SHAPE picker (Cross/Dot+/Dot/T/X/Ring, all Free) with purple selection dot,
+  Pro-locked SIZE (Length/Thickness/Gap), OUTLINE (toggle + thickness + color),
+  CENTER DOT toggle, and POSITION (Recenter + H/V sliders + 1px nudge arrows).
+  Purple #8B5CF6 accents, 🔒 Pro badges, greyed locked sections. Old designs
+  migrate automatically. Recenter/nudge are Pro-gated, including the hotkey.
+
 ## v2.4.2
 
 - **Crosshair overlay tab**: separate transparent always-on-top window for

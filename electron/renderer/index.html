@@ -399,39 +399,65 @@
       <div class="page-head"><h1>Crosshair</h1><p>Transparent overlay for borderless games · click-through, Alt+drag to move</p></div>
       <div class="glass card ch-banner">
         <span class="ch-dot"></span>
-        <p id="ch-banner-text">You're on the free crosshair. Three presets, in any color you like. Pro unlocks layers, shapes, sizes and position, and lets you save your own designs.</p>
+        <p id="ch-banner-text">You're on the free crosshair. Six shapes, in any color you like. Pro unlocks layers, sizes, outline, center dot, position, and lets you save your own designs.</p>
         <button class="btn ch-pro-btn" id="ch-unlock">Unlock · $15</button>
       </div>
       <div class="ch-layout">
         <div class="ch-main">
-          <div class="glass card">
-            <h3>Presets</h3>
-            <div id="ch-presets" class="ch-preset-grid"></div>
+          <div class="glass card ch-sec" id="ch-sec-saved">
+            <div class="ch-card-head"><h3>MY CROSSHAIRS</h3><button class="btn ch-pro-btn small" id="ch-save">Save current</button></div>
+            <div id="ch-saved"><p class="dim">Nothing saved yet. Build a crosshair you like, then hit Save current to keep it.</p></div>
           </div>
-          <div class="glass card">
-            <h3>Color</h3>
+          <div class="glass card ch-sec" id="ch-sec-layers">
+            <div class="ch-card-head"><h3>LAYERS <span class="ch-lock" data-lock>🔒 Pro</span></h3><button class="btn ch-pro-btn small" id="ch-add-layer">+ Add</button></div>
+            <div id="ch-layers"></div>
+            <p class="dim">Layers stack in order - later ones draw on top. Stack a thick dark shape under a thin bright one for a built-in outline.</p>
+          </div>
+          <div class="glass card ch-sec" id="ch-sec-shape">
+            <div class="ch-card-head"><h3 id="ch-shape-title">SHAPE - LAYER 1</h3></div>
+            <div id="ch-shapes" class="ch-shape-grid"></div>
             <div class="ch-color-row">
+              <span class="dim">Color</span>
               <div id="ch-colors" class="ch-swatches"></div>
               <label class="ch-custom">Custom<input type="color" id="ch-custom-color" value="#22ff88" /></label>
             </div>
-            <p class="dim">Pick any color you like. Shape, size and position unlock with <b>Pro</b>.</p>
           </div>
-          <div class="glass card">
-            <div class="ch-card-head"><h3>My crosshairs</h3><button class="btn ch-pro-btn small" id="ch-save">Save current</button></div>
-            <div id="ch-saved"><p class="dim">Nothing saved yet. Build a crosshair you like, then Save current.</p></div>
-          </div>
-          <div class="glass card">
-            <div class="ch-card-head"><h3>Layers <span class="pro-tag pro-purple">PRO</span></h3><button class="btn ch-pro-btn small" id="ch-add-layer">+ Add</button></div>
-            <div id="ch-layers"></div>
-          </div>
-          <div class="glass card ch-pro-card">
-            <h3>Size · Position · Opacity <span class="pro-tag pro-purple">PRO</span></h3>
+          <div class="glass card ch-sec" id="ch-sec-size">
+            <div class="ch-card-head"><h3>SIZE <span class="ch-lock" data-lock>🔒 Pro</span></h3></div>
             <div class="ch-sliders">
-              <label>Size <span id="ch-size-v">22</span><input type="range" id="ch-size" min="4" max="80" value="22" /></label>
-              <label>Thickness <span id="ch-thick-v">3</span><input type="range" id="ch-thick" min="1" max="12" value="3" /></label>
-              <label>Opacity <span id="ch-op-v">100%</span><input type="range" id="ch-opacity" min="10" max="100" value="100" /></label>
-              <label>Position X <span id="ch-x-v">0</span><input type="range" id="ch-x" min="-500" max="500" value="0" /></label>
-              <label>Position Y <span id="ch-y-v">0</span><input type="range" id="ch-y" min="-500" max="500" value="0" /></label>
+              <label>Length <span id="ch-len-v">10 px</span><input type="range" id="ch-len" min="2" max="60" value="10" /></label>
+              <label>Thickness <span id="ch-thick-v">2 px</span><input type="range" id="ch-thick" min="1" max="12" value="2" /></label>
+              <label>Gap <span id="ch-gap-v">4 px</span><input type="range" id="ch-gap" min="0" max="24" value="4" /></label>
+            </div>
+          </div>
+          <div class="glass card ch-sec" id="ch-sec-outline">
+            <div class="ch-card-head"><h3>OUTLINE <span class="ch-lock" data-lock>🔒 Pro</span></h3><label class="toggle"><input type="checkbox" id="ch-outline-toggle" /><span class="track"></span></label></div>
+            <p class="dim">Keeps this layer readable on bright scenes.</p>
+            <div class="ch-sliders">
+              <label>Outline thickness <span id="ch-ol-thick-v">1 px</span><input type="range" id="ch-ol-thick" min="1" max="6" value="1" /></label>
+            </div>
+            <div class="ch-color-row">
+              <span class="dim">Outline color</span>
+              <span class="ch-ol-swatch" id="ch-ol-swatch"></span>
+              <label class="ch-custom">Custom<input type="color" id="ch-ol-custom" value="#000000" /></label>
+            </div>
+          </div>
+          <div class="glass card ch-sec" id="ch-sec-dot">
+            <div class="ch-card-head"><h3>CENTER DOT <span class="ch-lock" data-lock>🔒 Pro</span></h3><label class="toggle"><input type="checkbox" id="ch-dot-toggle" /><span class="track"></span></label></div>
+            <p class="dim">Adds a dot at the exact center of this layer.</p>
+          </div>
+          <div class="glass card ch-sec" id="ch-sec-position">
+            <div class="ch-card-head"><h3>POSITION <span class="ch-lock" data-lock>🔒 Pro</span></h3><button class="btn secondary small" id="ch-reset" title="Snap back to the center of the primary screen (Ctrl+Alt+Shift+R)">Recenter</button></div>
+            <p class="dim">Moves the whole crosshair, not just this layer. If your game centers the aim point away from the middle of the screen (common on stretched resolutions), nudge it here until it lines up.</p>
+            <div class="ch-sliders">
+              <label>Horizontal <span id="ch-x-v">0 px</span><input type="range" id="ch-x" min="-500" max="500" value="0" /></label>
+              <label>Vertical <span id="ch-y-v">0 px</span><input type="range" id="ch-y" min="-500" max="500" value="0" /></label>
+            </div>
+            <div class="ch-nudge-row">
+              <button class="ch-mini-btn ch-nudge" id="ch-n-left" title="Move 1px left">←</button>
+              <button class="ch-mini-btn ch-nudge" id="ch-n-up" title="Move 1px up">↑</button>
+              <button class="ch-mini-btn ch-nudge" id="ch-n-down" title="Move 1px down">↓</button>
+              <button class="ch-mini-btn ch-nudge" id="ch-n-right" title="Move 1px right">→</button>
             </div>
           </div>
         </div>
@@ -442,9 +468,6 @@
           </div>
           <button class="btn ch-toggle" id="ch-toggle">⏻&nbsp; Turn crosshair on</button>
           <p class="dim ch-hint">Run your game in borderless or windowed mode so the overlay can draw on top of it.</p>
-          <div class="row">
-            <button class="btn secondary" id="ch-reset" title="Snap back to the center of the primary screen">⌖&nbsp; Reset to center</button>
-          </div>
           <p class="dim ch-hint">Hold <b>Alt</b> and drag the overlay to move it · <b>Ctrl+Alt+Shift+R</b> recenters.</p>
         </div>
       </div>
@@ -556,7 +579,7 @@
         <button class="btn danger" id="settings-revert-all">⟲&nbsp; Revert all changes</button>
       </div>
       <div class="glass card"><h3>About</h3>
-        <p class="dim">TidalTweaks v2.4.2 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
+        <p class="dim">TidalTweaks v2.4.3 · Electron · Windows 10/11 · No accounts, no telemetry, no payment processors.</p>
         <p class="dim">Antivirus flags? False positive — this app edits the registry and runs PowerShell like every optimizer does, so heuristics complain. Full source is on GitHub; read every line.</p>
       </div>
     </section>

@@ -4,7 +4,8 @@
   Fullscreen + transparent + frameless. Click-through by default; holding Alt
   makes it movable so Alt+drag repositions the drawing. Rendered with inline
   SVG (crisp at any size, zero deps). Receives live config via
-  'crosshair:update' pushed from core/crosshair.js.
+  'crosshair:update' pushed from core/crosshair.js on every change.
+  Layers stack in order — later ones draw on top.
 -->
 <html lang="en">
 <head>
@@ -21,97 +22,107 @@
     cursor: default;
   }
   body.movable { cursor: move; }
-  /* Fullscreen drag surface. -webkit-app-region is NOT used (window is
-     fullscreen + movable:false); dragging moves the DRAWING via IPC deltas. */
   #stage { position: fixed; inset: 0; background: transparent; }
   #stage svg { display: block; width: 100vw; height: 100vh; }
-  #hint {
+  #hint, #locked {
     position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
     font: 600 12px 'Segoe UI', system-ui, sans-serif;
     color: rgba(255,255,255,0.85); background: rgba(10,16,32,0.72);
-    border: 1px solid rgba(157,123,255,0.5); border-radius: 8px;
+    border: 1px solid rgba(139,92,246,0.5); border-radius: 8px;
     padding: 6px 12px; display: none; pointer-events: none;
     white-space: nowrap;
   }
   body.movable #hint { display: block; }
+  #locked.show { display: block; border-color: rgba(139,92,246,0.8); }
 </style>
 </head>
 <body>
 <div id="stage"><svg id="ch-svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
 <div id="hint">Alt+drag to move · release Alt to lock · Ctrl+Alt+Shift+R to recenter</div>
+<div id="locked">🔒 Position needs Pro</div>
 <script>
 (function () {
   'use strict';
   var svg = document.getElementById('ch-svg');
+  var lockedEl = document.getElementById('locked');
   var NS = 'http://www.w3.org/2000/svg';
   var cfg = null;
   var movable = false;
   var dragging = false;
   var lastX = 0, lastY = 0;
+  var lockedTimer = 0;
 
-  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function num(v, fb) { v = Number(v); return Number.isFinite(v) ? v : fb; }
 
-  /* Draw one layer shape centered at (cx, cy). Returns SVGElement group. */
-  function drawShape(g, shape, cx, cy, size, thick, color, opacity) {
-    var s = Number(size) || 22;
-    var t = Number(thick) || 3;
-    var half = s / 2;
-    var gap = Math.max(2, s * 0.22);
-    function line(x1, y1, x2, y2) {
-      var l = document.createElementNS(NS, 'line');
-      l.setAttribute('x1', x1); l.setAttribute('y1', y1);
-      l.setAttribute('x2', x2); l.setAttribute('y2', y2);
-      l.setAttribute('stroke', color);
-      l.setAttribute('stroke-width', t);
-      l.setAttribute('stroke-linecap', 'round');
-      l.setAttribute('opacity', opacity);
-      g.appendChild(l);
+  /* Draw one layer. Two passes when outline is on: a thick dark shape
+   * underneath, the thin bright shape on top (built-in outline). */
+  function drawLayer(g, l, cx, cy) {
+    var len = num(l.length, 10);
+    var th = num(l.thickness, 2);
+    var gap = num(l.gap, 4);
+    var col = (/^#[0-9a-fA-F]{6}$/.test(l.color || '') ? l.color : '#22FF88');
+    var op = (l.visible === false) ? 0 : 1;
+    var ol = l.outline || {};
+    var useOl = !!ol.enabled;
+    var olTh = num(ol.thickness, 1);
+    var olCol = (/^#[0-9a-fA-F]{6}$/.test(ol.color || '') ? ol.color : '#000000');
+    var dot = !!(l.centerDot && l.centerDot.enabled);
+    var dotR = Math.max(2, th);
+    var half = gap + len;
+
+    function line(x1, y1, x2, y2, stroke, w) {
+      var e = document.createElementNS(NS, 'line');
+      e.setAttribute('x1', x1); e.setAttribute('y1', y1);
+      e.setAttribute('x2', x2); e.setAttribute('y2', y2);
+      e.setAttribute('stroke', stroke); e.setAttribute('stroke-width', w);
+      e.setAttribute('stroke-linecap', 'round'); e.setAttribute('opacity', op);
+      g.appendChild(e);
     }
-    function circle(r, fill, strokeW) {
-      var c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
-      c.setAttribute('fill', fill ? color : 'none');
-      c.setAttribute('fill-opacity', fill ? opacity : 0);
-      if (!fill) { c.setAttribute('stroke', color); c.setAttribute('stroke-width', strokeW || t); c.setAttribute('opacity', opacity); }
-      g.appendChild(c);
+    function fillCircle(r, fill) {
+      var e = document.createElementNS(NS, 'circle');
+      e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('r', r);
+      e.setAttribute('fill', fill); e.setAttribute('opacity', op);
+      g.appendChild(e);
     }
-    // Subtle dark outline for visibility on bright games (drawn first).
-    function outline(fn) { fn(); }
-    if (shape === 'dot') {
-      circle(Math.max(2, s * 0.22), true);
-    } else if (shape === 'cross') {
-      var d = half * 0.75;
-      line(cx - d, cy - d, cx + d, cy + d);
-      line(cx - d, cy + d, cx + d, cy - d);
-    } else if (shape === 't-shape') {
-      line(cx - half, cy - half, cx + half, cy - half);
-      line(cx, cy - half, cx, cy + half);
-    } else if (shape === 'ring') {
-      circle(half, false);
-      circle(1.6, true);
-    } else if (shape === 'double') {
-      circle(half, false);
-      circle(half * 0.55, false, Math.max(1.5, t * 0.7));
-      circle(1.6, true);
-    } else if (shape === 'plus-dot') {
-      line(cx - half, cy, cx - gap, cy);
-      line(cx + gap, cy, cx + half, cy);
-      line(cx, cy - half, cx, cy - gap);
-      line(cx, cy + gap, cx, cy + half);
-      circle(Math.max(1.8, t * 0.7), true);
-    } else if (shape === 'complex') {
-      line(cx - half, cy, cx - gap, cy);
-      line(cx + gap, cy, cx + half, cy);
-      line(cx, cy - half, cx, cy - gap);
-      line(cx, cy + gap, cx, cy + half);
-      circle(half * 0.72, false, Math.max(1.2, t * 0.55));
-      circle(1.6, true);
-    } else { // 'classic' default
-      line(cx - half, cy, cx - gap, cy);
-      line(cx + gap, cy, cx + half, cy);
-      line(cx, cy - half, cx, cy - gap);
-      line(cx, cy + gap, cx, cy + half);
+    function ringCircle(r, stroke, w) {
+      var e = document.createElementNS(NS, 'circle');
+      e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('r', r);
+      e.setAttribute('fill', 'none'); e.setAttribute('stroke', stroke);
+      e.setAttribute('stroke-width', w); e.setAttribute('opacity', op);
+      g.appendChild(e);
     }
+    // pass = 0 → outline underlay (wider, dark), pass = 1 → main shape.
+    function shape(pass) {
+      var w = (pass === 0) ? th + 2 * olTh : th;
+      var c = (pass === 0) ? olCol : col;
+      var sh = l.shape || 'cross';
+      if (sh === 'dot') {
+        var r = Math.max(2, len / 2) + (pass === 0 ? olTh : 0);
+        fillCircle(r, c);
+      } else if (sh === 'ring') {
+        ringCircle(len + (pass === 0 ? olTh : 0), c, w);
+        if (pass === 1) fillCircle(Math.max(1.2, th * 0.5), c);
+      } else if (sh === 'x') {
+        var d = half * 0.75;
+        line(cx - d, cy - d, cx + d, cy + d, c, w);
+        line(cx - d, cy + d, cx + d, cy - d, c, w);
+      } else if (sh === 't') {
+        line(cx - half, cy - half * 0.55, cx + half, cy - half * 0.55, c, w);
+        line(cx, cy - half * 0.55, cx, cy + half * 0.8, c, w);
+      } else { // 'cross' + 'dot-plus'
+        line(cx - half, cy, cx - gap, cy, c, w);
+        line(cx + gap, cy, cx + half, cy, c, w);
+        line(cx, cy - half, cx, cy - gap, c, w);
+        line(cx, cy + gap, cx, cy + half, c, w);
+        if (sh === 'dot-plus' || (pass === 1 && dot)) fillCircle(dotR + (pass === 0 ? olTh : 0), c);
+        else if (pass === 0 && dot) fillCircle(dotR + olTh, c);
+      }
+      // Center-dot toggle (all shapes): dot at the exact center.
+      if (pass === 1 && dot && sh !== 'cross' && sh !== 'dot-plus') fillCircle(dotR, c);
+      if (pass === 0 && dot && useOl && sh !== 'cross' && sh !== 'dot-plus' && sh !== 'dot' && sh !== 'ring') fillCircle(dotR + olTh, c);
+    }
+    if (useOl) shape(0);
+    shape(1);
   }
 
   function render() {
@@ -119,23 +130,25 @@
     if (!cfg || !cfg.enabled) return;
     var W = window.innerWidth || 1920;
     var H = window.innerHeight || 1080;
-    var baseX = W / 2 + (Number(cfg.x) || 0);
-    var baseY = H / 2 + (Number(cfg.y) || 0);
-    var color = (cfg.color && /^#[0-9a-fA-F]{6}$/.test(cfg.color)) ? cfg.color : '#22FF88';
-    var layers = (cfg.layers && cfg.layers.length) ? cfg.layers : [{ shape: cfg.preset || 'classic', size: cfg.size || 22, thickness: cfg.thickness || 3, opacity: cfg.opacity != null ? cfg.opacity : 1, x: 0, y: 0, visible: true }];
-    // Drop shadow filter for readability (cheap, one filter).
+    var baseX = W / 2 + num(cfg.x, 0);
+    var baseY = H / 2 + num(cfg.y, 0);
+    var layers = (cfg.layers && cfg.layers.length) ? cfg.layers : [];
     var defs = document.createElementNS(NS, 'defs');
-    defs.innerHTML = '<filter id="ch-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="1.2" flood-color="black" flood-opacity="0.9"/></filter>';
+    defs.innerHTML = '<filter id="ch-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="1" flood-color="black" flood-opacity="0.85"/></filter>';
     svg.appendChild(defs);
     layers.forEach(function (l) {
       if (l.visible === false) return;
       var g = document.createElementNS(NS, 'g');
       g.setAttribute('filter', 'url(#ch-shadow)');
-      var cx = baseX + (Number(l.x) || 0);
-      var cy = baseY + (Number(l.y) || 0);
-      drawShape(g, l.shape || 'classic', cx, cy, l.size || 22, l.thickness || 3, color, (l.opacity != null ? l.opacity : 1));
+      drawLayer(g, l, baseX, baseY);
       svg.appendChild(g);
     });
+  }
+
+  function flashLocked() {
+    lockedEl.classList.add('show');
+    if (lockedTimer) clearTimeout(lockedTimer);
+    lockedTimer = setTimeout(function () { lockedEl.classList.remove('show'); }, 2200);
   }
 
   function setMovable(m) {
@@ -151,8 +164,8 @@
   }
 
   /* Alt+drag: key handlers run when the overlay can receive keys (setup /
-     borderless focus). The main process ALSO mirrors Alt state globally where
-     possible; both paths funnel into setMovable + nudge. */
+     borderless focus). Position is a Pro feature — Free nudges are rejected
+     by main and flash the lock note instead of moving. */
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Alt' || e.altKey) setMovable(true);
   });
@@ -171,7 +184,9 @@
     var dx = e.screenX - lastX, dy = e.screenY - lastY;
     lastX = e.screenX; lastY = e.screenY;
     if ((dx || dy) && window.api && window.api.crosshair && window.api.crosshair.nudge) {
-      window.api.crosshair.nudge(dx, dy).catch(function () {});
+      window.api.crosshair.nudge(dx, dy).then(function (r) {
+        if (r && r.ok === false) { dragging = false; flashLocked(); }
+      }).catch(function () {});
     }
   });
   window.addEventListener('mouseup', function () { dragging = false; });
@@ -187,7 +202,6 @@
         }
         var r = await window.api.crosshair.get();
         if (r && r.config) applyConfig(r.config);
-        else if (r && r.ok === false) applyConfig(null);
       }
     } catch (e) { /* overlay stays transparent */ }
   }

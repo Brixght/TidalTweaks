@@ -742,3 +742,86 @@ body.lite .ch-preset.selected, body.lite .ch-pro-btn:hover:not(:disabled), body.
   .ch-side { position: static; }
   .ch-preset-grid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ==================== Crosshair tab v2 (screenshot spec) =================
+ * Purple accent #8B5CF6 everywhere. Pro-locked sections grey out with a
+ * 🔒 Pro badge for Free users; everything animates on the standard easing. */
+.ch-sec h3 { letter-spacing: 0.6px; }
+.ch-lock {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; white-space: nowrap;
+  color: #fff; background: linear-gradient(135deg, #7C5CFF, #8B5CF6);
+  padding: 2px 9px; border-radius: 12px; vertical-align: 2px;
+  box-shadow: 0 0 10px rgba(139,92,246,0.45);
+}
+.ch-lock.unlocked { background: rgba(139,92,246,0.16); color: #B7A6FF; box-shadow: none; border: 1px solid rgba(139,92,246,0.4); }
+
+/* Shape grid: 6 tiles. Selected gets purple border + purple dot indicator. */
+.ch-shape-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 14px; }
+.ch-shape {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 4px 9px; border-radius: 10px; cursor: pointer;
+  background: rgba(var(--deep-rgb), 0.5);
+  border: 1px solid rgba(var(--accent-rgb), 0.14);
+  transition: all 0.2s var(--ease);
+  animation: pageIn 0.25s var(--ease);
+}
+.ch-shape:hover { border-color: rgba(139,92,246,0.55); box-shadow: 0 0 14px rgba(139,92,246,0.25); transform: translateY(-1px); }
+.ch-shape.selected { border-color: #8B5CF6; box-shadow: 0 0 16px rgba(139,92,246,0.5); background: rgba(139,92,246,0.1); }
+.ch-shape svg { width: 34px; height: 34px; }
+.ch-shape span { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.ch-shape.selected span { color: #fff; }
+.ch-shape .ch-sel-dot {
+  display: none; position: absolute; top: 7px; right: 7px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #8B5CF6; box-shadow: 0 0 8px rgba(139,92,246,0.9);
+}
+.ch-shape.selected .ch-sel-dot { display: block; }
+
+/* Layer rows: "Layer 1 - cross - 2px" + color square (visibility). */
+.ch-layer-row.selected { border-color: #8B5CF6; box-shadow: 0 0 14px rgba(139,92,246,0.35); }
+.ch-layer-swatch {
+  width: 16px; height: 16px; min-width: 16px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.35);
+  transition: all 0.18s var(--ease);
+}
+.ch-layer-swatch:hover { transform: scale(1.15); }
+.ch-layer-row.hidden-layer { opacity: 0.55; }
+.ch-layer-row.hidden-layer .ch-layer-swatch { background: transparent !important; border-style: dashed; }
+
+/* Locked Pro sections: greyed, non-interactive controls. */
+.ch-sec.locked .ch-sliders,
+.ch-sec.locked .ch-nudge-row,
+.ch-sec.locked .ch-color-row { opacity: 0.42; filter: saturate(0.4); }
+.ch-sec.locked .ch-sliders input,
+.ch-sec.locked .ch-nudge-row button,
+.ch-sec.locked .ch-color-row input,
+.ch-sec.locked .ch-color-row .ch-ol-swatch { pointer-events: none; }
+.ch-sliders input[type="range"] { accent-color: #8B5CF6; }
+.ch-sliders input[type="range"]:disabled { accent-color: #5a6478; cursor: not-allowed; }
+.toggle input:disabled + .track { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* Outline color swatch (black default) + nudge pad. */
+.ch-ol-swatch {
+  width: 30px; height: 22px; border-radius: 6px; background: #000;
+  border: 2px solid rgba(255,255,255,0.35);
+}
+.ch-nudge-row { display: flex; gap: 8px; margin-top: 12px; }
+.ch-nudge {
+  flex: 1; padding: 8px 0; font-size: 15px; text-align: center;
+  border-radius: 9px;
+}
+.ch-nudge:hover:not(:disabled) { border-color: #8B5CF6; box-shadow: 0 0 12px rgba(139,92,246,0.45); }
+.ch-nudge:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Screenshot-spec purple pass over v1 crosshair controls. */
+.ch-pro-btn {
+  background: linear-gradient(135deg, #7C5CFF, #8B5CF6) !important;
+}
+.ch-pro-btn:hover:not(:disabled) { box-shadow: 0 0 20px rgba(139,92,246,0.6) !important; }
+.ch-toggle {
+  background: linear-gradient(135deg, #7C5CFF, #8B5CF6);
+}
+.ch-toggle:hover { box-shadow: 0 0 24px rgba(139,92,246,0.65); }
+.ch-preset.selected, .ch-shape.selected { border-color: #8B5CF6; }
+.btn.secondary.small { padding: 6px 13px; font-size: 11.5px; }
